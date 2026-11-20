@@ -14,6 +14,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.greg.one2many.exception.InvalidSessionException;
+import com.greg.one2many.exception.AttendeeNotFoundException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -79,4 +80,9 @@ public class GlobalExceptionHandler {
                 .body(Map.of("error", resolve(ex.getMessage())));
     }
 
+    @ExceptionHandler(AttendeeNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleAttendeeNotFound(AttendeeNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", resolve(ex.getMessage())));
+    }
 }

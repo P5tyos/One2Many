@@ -50,7 +50,7 @@ public class AttendeeController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .body(new PersonalPageResponse(
-                        attendee.getName() != null, attendee.getName(), attendee.getMessage()));
+                    attendee.getName() != null, attendee.getName(), attendee.getMessage(), attendee.getStatus()));
     }
 
     @PostMapping("/{token}/profile")
@@ -61,7 +61,7 @@ public class AttendeeController {
 
         Attendee attendee = attendeeService.completeProfile(
                 token, session, request.getName(), request.getMessage());
-        return new PersonalPageResponse(true, attendee.getName(), attendee.getMessage());
+        return new PersonalPageResponse(true, attendee.getName(), attendee.getMessage(), attendee.getStatus());
     }
 
     @GetMapping("/{token}/list")

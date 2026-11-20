@@ -1,6 +1,7 @@
 package com.greg.one2many.moderation;
 
 import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
@@ -12,10 +13,11 @@ import java.text.Normalizer;
 import java.util.HashSet;
 import java.util.Set;
 
+@Slf4j
 @Service
 public class ProfanityService {
 
-    // word lists sourced from LDNOOBW (github.com/LDNOOBW) — en, es, pt
+    // word lists sourced from LDNOOBW (github.com/LDNOOBW) — en, es (expanded), pt
     private static final String[] WORD_LIST_FILES = {
             "profanity/en.txt", "profanity/es.txt", "profanity/pt.txt"
     };
@@ -29,21 +31,23 @@ public class ProfanityService {
                     new ClassPathResource(file).getInputStream(), StandardCharsets.UTF_8))) {
                 reader.lines()
                         .map(this::normalize)
-                        .filter(line -> !line.isBlank())
+                        .filter(term -> !term.isBlank())
                         .forEach(blockedTerms::add);
             } catch (IOException e) {
                 throw new IllegalStateException("Could not load profanity list: " + file, e);
             }
         }
+        log.info("Loaded {} blocked terms", blockedTerms.size());
     }
 
     public boolean containsProfanity(String text) {
         if (text == null || text.isBlank()) {
             return false;
         }
-        String normalized = normalize(text);
+        // pad with spaces so every word, including the first and last, has a space on both sides
+        String padded = " " + normalize(text) + " ";
         for (String term : blockedTerms) {
-            if (normalized.contains(term)) {
+            if (padded.contains(" " + term + " ")) {
                 return true;
             }
         }
@@ -53,7 +57,7 @@ public class ProfanityService {
     private String normalize(String input) {
         String lower = input.toLowerCase();
 
-        // strip accents (café -> cafe), so accented evasions still match
+        // strip accents (café -> cafe, ñ -> n)
         String deAccented = Normalizer.normalize(lower, Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "");
 
@@ -68,9 +72,13 @@ public class ProfanityService {
                 .replace('@', 'a')
                 .replace('$', 's');
 
-        // collapse repeated characters (e.g. "shiiiit" -> "shit")
+        // collapse 3+ repeated characters ("shiiiit" -> "shit")
         String collapsed = deLeeted.replaceAll("(.)\\1{2,}", "$1");
 
-        return collapsed;
+        // punctuation becomes a space, so "word," and "word!" still count as "word";
+        // then squeeze multiple spaces into one
+        return collapsed.replaceAll("[^a-z]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 }
