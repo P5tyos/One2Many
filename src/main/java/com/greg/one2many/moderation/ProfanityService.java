@@ -55,11 +55,15 @@ public class ProfanityService {
     }
 
     private String normalize(String input) {
-        String lower = input.toLowerCase();
+        // NFC first: some phones send ñ as two characters (n + ~); this joins them into one
+        String lower = Normalizer.normalize(input, Normalizer.Form.NFC).toLowerCase();
 
-        // strip accents (café -> cafe, ñ -> n)
-        String deAccented = Normalizer.normalize(lower, Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "");
+        // strip accents (café -> cafe) BUT keep ñ as its own letter:
+        // otherwise año -> ano, coño -> cono, gañán -> ganan (found 20 Nov)
+        String protectedN = lower.replace('ñ', '\u0001');
+        String deAccented = Normalizer.normalize(protectedN, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .replace('\u0001', 'ñ');
 
         // basic leetspeak substitutions
         String deLeeted = deAccented
@@ -77,7 +81,7 @@ public class ProfanityService {
 
         // punctuation becomes a space, so "word," and "word!" still count as "word";
         // then squeeze multiple spaces into one
-        return collapsed.replaceAll("[^a-z]", " ")
+        return collapsed.replaceAll("[^a-zñ]", " ")
                 .replaceAll("\\s+", " ")
                 .trim();
     }

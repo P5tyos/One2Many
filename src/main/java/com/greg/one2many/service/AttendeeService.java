@@ -2,13 +2,20 @@ package com.greg.one2many.service;
 
 import com.greg.one2many.domain.Attendee;
 import com.greg.one2many.domain.AttendeeStatus;
+import com.greg.one2many.domain.Rescan;
+import com.greg.one2many.domain.RescanStatus;
+import com.greg.one2many.domain.ScanStatus;
 import com.greg.one2many.dto.AdminAttendeeView;
 import com.greg.one2many.dto.AdminStats;
 import com.greg.one2many.dto.AttendeeSummary;
+import com.greg.one2many.dto.RescanView;
+import com.greg.one2many.dto.ScanInResponse;
 import com.greg.one2many.exception.AttendeeNotFoundException;
 import com.greg.one2many.exception.InappropriateContentException;
 import com.greg.one2many.exception.InvalidSessionException;
 import com.greg.one2many.exception.InvalidTokenException;
+import com.greg.one2many.exception.RescanClosedException;
+import com.greg.one2many.exception.SessionReplacedException;
 import com.greg.one2many.exception.TokenAlreadyUsedException;
 import com.greg.one2many.moderation.ProfanityService;
 import jakarta.annotation.PreDestroy;
@@ -19,12 +26,14 @@ import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -40,6 +49,11 @@ public class AttendeeService {
     private final Map<String, Attendee> byLinkedinUrl = new ConcurrentHashMap<>();
     private final Map<String, Attendee> byToken = new ConcurrentHashMap<>();
 
+    // re-scans of people whose page is already open, waiting for the moderator
+    private final Map<String, Rescan> rescans = new ConcurrentHashMap<>();
+    // old tokens killed by a re-scan → message key, so the old page can say WHY it stopped working
+    private final Map<String, String> retiredTokens = new ConcurrentHashMap<>();
+
         // running totals for the session summary: only ever go up, survive removals
     private final AtomicLong totalJoined = new AtomicLong();
     private final AtomicLong totalFlags = new AtomicLong();
@@ -47,6 +61,9 @@ public class AttendeeService {
 
     @Value("${one2many.moderation.flags-before-review:3}")
     private int flagsBeforeReview;
+
+    @Value("${one2many.moderation.rescan-timeout-seconds:120}")
+    private int rescanTimeoutSeconds;
 
     @Value("${one2many.host.name:}")
     private String hostName;
@@ -59,23 +76,24 @@ public class AttendeeService {
 
     // ---------- station ----------
 
-    public Attendee scanIn(String linkedinUrl) {
+    public ScanInResponse scanIn(String linkedinUrl) {
         String normalized = normalize(linkedinUrl);
         Attendee existing = byLinkedinUrl.get(normalized);
 
-        String freshToken = UUID.randomUUID().toString();
-
         if (existing != null) {
             synchronized (existing) {
-                byToken.remove(existing.getId());
-                existing.setId(freshToken);
-                existing.setRedeemed(false);
-                existing.setSessionSecret(null);
-                byToken.put(freshToken, existing);
+                if (existing.isRedeemed()) {
+                    // someone already holds this page: don't kill it, ask the moderator first
+                    Rescan rescan = findWaitingRescan(existing).orElseGet(() -> createRescan(existing));
+                    return new ScanInResponse(ScanStatus.AWAITING_CONFIRMATION, null, rescan.getId(), existing.getName() != null);
+                }
+                // page never opened: nobody to protect, issue a fresh token straight away
+                String token = rotateToken(existing);
+                return new ScanInResponse(ScanStatus.ISSUED, token, null, existing.getName() != null);
             }
-            return existing;
         }
 
+        String freshToken = UUID.randomUUID().toString();
         Attendee attendee = Attendee.builder()
                 .id(freshToken)
                 .adminId(UUID.randomUUID().toString())
@@ -86,7 +104,7 @@ public class AttendeeService {
         totalJoined.incrementAndGet();
         byLinkedinUrl.put(normalized, attendee);
         byToken.put(freshToken, attendee);
-        return attendee;
+        return new ScanInResponse(ScanStatus.ISSUED, freshToken, null, false);
     }
 
     // ---------- attendee ----------
@@ -178,7 +196,8 @@ public class AttendeeService {
                 byLinkedinUrl.size(),
                 countWhere(a -> a.getName() != null),
                 countWhere(a -> a.getStatus() == AttendeeStatus.FLAGGED),
-                countWhere(a -> a.getStatus() == AttendeeStatus.PENDING_REVIEW));
+                countWhere(a -> a.getStatus() == AttendeeStatus.PENDING_REVIEW),
+                listWaitingRescans().size());
     }
 
     public void flag(String adminId) {
@@ -217,9 +236,119 @@ public class AttendeeService {
         logSummary("Event reset by moderator");
         byToken.clear();
         byLinkedinUrl.clear();
+        rescans.clear();
+        retiredTokens.clear();
         totalJoined.set(0);
         totalFlags.set(0);
         totalRemoved.set(0);
+    }
+
+    // ---------- re-scan confirmation ----------
+
+    public List<RescanView> listWaitingRescans() {
+        return rescans.values().stream()
+                .peek(this::expireIfStale)
+                .filter(r -> r.getStatus() == RescanStatus.WAITING)
+                .sorted(Comparator.comparing(Rescan::getRequestedAt))
+                .map(this::toView)
+                .collect(Collectors.toList());
+    }
+
+    // the station asks "any news?" about its re-scan every second or two
+    public RescanView getRescan(String rescanId) {
+        Rescan rescan = findRescan(rescanId);
+        expireIfStale(rescan);
+        return toView(rescan);
+    }
+
+    public void confirmRescan(String rescanId) {
+        Rescan rescan = findRescan(rescanId);
+        Attendee attendee = rescan.getAttendee();
+        synchronized (attendee) {
+            expireIfStale(rescan);
+            if (rescan.getStatus() != RescanStatus.WAITING) {
+                throw new RescanClosedException("admin.rescanClosed");
+            }
+            if (!byLinkedinUrl.containsKey(attendee.getLinkedinUrl())) {
+                // removed by a moderator in the meantime
+                rescan.setStatus(RescanStatus.REJECTED);
+                throw new RescanClosedException("admin.rescanClosed");
+            }
+            rescan.setNewToken(rotateToken(attendee));
+            rescan.setStatus(RescanStatus.CONFIRMED);
+        }
+        log.warn("Moderator CONFIRMED re-scan of '{}': old session closed", displayName(attendee));
+    }
+
+    public void rejectRescan(String rescanId) {
+        Rescan rescan = findRescan(rescanId);
+        synchronized (rescan.getAttendee()) {
+            expireIfStale(rescan);
+            if (rescan.getStatus() != RescanStatus.WAITING) {
+                throw new RescanClosedException("admin.rescanClosed");
+            }
+            rescan.setStatus(RescanStatus.REJECTED);
+        }
+        log.warn("Moderator REJECTED re-scan of '{}': existing session kept", displayName(rescan.getAttendee()));
+    }
+
+    private Rescan createRescan(Attendee attendee) {   // caller holds the attendee lock
+        Instant now = Instant.now();
+        // tidy up: finished re-scans older than 10 minutes are no longer needed
+        rescans.values().removeIf(r -> r.getStatus() != RescanStatus.WAITING
+                && r.getRequestedAt().isBefore(now.minus(Duration.ofMinutes(10))));
+        Rescan rescan = new Rescan(UUID.randomUUID().toString(), attendee, now, RescanStatus.WAITING, null);
+        rescans.put(rescan.getId(), rescan);
+        log.warn("Re-scan of '{}' while their page is open — waiting for moderator", displayName(attendee));
+        return rescan;
+    }
+
+    private Optional<Rescan> findWaitingRescan(Attendee attendee) {
+        return rescans.values().stream()
+                .filter(r -> r.getAttendee() == attendee)
+                .peek(this::expireIfStale)
+                .filter(r -> r.getStatus() == RescanStatus.WAITING)
+                .findFirst();
+    }
+
+    // "lazy" timeout: no timer runs in the background; a re-scan is checked whenever someone looks at it
+    private void expireIfStale(Rescan rescan) {
+        if (rescan.getStatus() == RescanStatus.WAITING
+                && rescan.getRequestedAt().plusSeconds(rescanTimeoutSeconds).isBefore(Instant.now())) {
+            rescan.setStatus(RescanStatus.EXPIRED);
+            log.warn("Re-scan of '{}' EXPIRED without an answer: existing session kept",
+                    displayName(rescan.getAttendee()));
+        }
+    }
+
+    private Rescan findRescan(String rescanId) {
+        Rescan rescan = rescans.get(rescanId);
+        if (rescan == null) {
+            throw new AttendeeNotFoundException("admin.rescanNotFound");
+        }
+        return rescan;
+    }
+
+    private RescanView toView(Rescan r) {
+        Attendee a = r.getAttendee();
+        return new RescanView(r.getId(), a.getAdminId(), a.getName(), a.getLinkedinUrl(),
+                r.getStatus(), r.getRequestedAt(), r.getNewToken());
+    }
+
+    // new token, old token retired (with a reason), old wristband dead — caller holds the attendee lock
+    private String rotateToken(Attendee attendee) {
+        String freshToken = UUID.randomUUID().toString();
+        byToken.remove(attendee.getId());
+        retiredTokens.put(attendee.getId(), "session.replaced");
+        attendee.setId(freshToken);
+        attendee.setRedeemed(false);
+        attendee.setSessionSecret(null);
+        byToken.put(freshToken, attendee);
+        return freshToken;
+    }
+
+    private String displayName(Attendee attendee) {
+        return attendee.getName() != null ? attendee.getName() : attendee.getLinkedinUrl();
     }
 
     // ---------- helpers ----------
@@ -241,6 +370,11 @@ public class AttendeeService {
     private Attendee findByToken(String token) {
         Attendee attendee = byToken.get(token);
         if (attendee == null) {
+            String retiredReason = retiredTokens.get(token);
+            if (retiredReason != null) {
+                // this token was valid, but a re-scan replaced it: tell the old page why
+                throw new SessionReplacedException(retiredReason);
+            }
             throw new InvalidTokenException("token.invalid");
         }
         return attendee;

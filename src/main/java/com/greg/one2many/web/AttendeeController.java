@@ -28,8 +28,8 @@ public class AttendeeController {
 
     @PostMapping("/scan")
     public ScanInResponse scanIn(@Valid @RequestBody ScanInRequest request) {
-        Attendee attendee = attendeeService.scanIn(request.getLinkedinUrl());
-        return new ScanInResponse(attendee.getId(), attendee.getName() != null);
+        // ISSUED → token ready; AWAITING_CONFIRMATION → page already open, moderator must confirm
+        return attendeeService.scanIn(request.getLinkedinUrl());
     }
 
     @GetMapping("/{token}")

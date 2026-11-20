@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.greg.one2many.exception.InvalidSessionException;
 import com.greg.one2many.exception.AttendeeNotFoundException;
+import com.greg.one2many.exception.RescanClosedException;
+import com.greg.one2many.exception.SessionReplacedException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -26,6 +28,20 @@ import lombok.extern.slf4j.Slf4j;
 public class GlobalExceptionHandler {
 
     private final MessageSource messageSource;
+
+    // 410 Gone: "this existed, but not any more" — the old page after a re-scan
+    @ExceptionHandler(SessionReplacedException.class)
+    public ResponseEntity<Map<String, String>> handleSessionReplaced(SessionReplacedException ex) {
+        return ResponseEntity.status(HttpStatus.GONE)
+                .body(Map.of("error", resolve(ex.getMessage())));
+    }
+
+    // 409 Conflict: confirming/rejecting a re-scan that was already answered or expired
+    @ExceptionHandler(RescanClosedException.class)
+    public ResponseEntity<Map<String, String>> handleRescanClosed(RescanClosedException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("error", resolve(ex.getMessage())));
+    }
 
     @ExceptionHandler(InvalidTokenException.class)
     public ResponseEntity<Map<String, String>> handleInvalidToken(InvalidTokenException ex) {

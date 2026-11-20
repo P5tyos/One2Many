@@ -34,7 +34,9 @@ Backend features complete and manually tested (16 test groups passing). Remainin
 
 | Method | URL | Body | Returns |
 |---|---|---|---|
-| POST | `/api/attendees/scan` | `{"linkedinUrl"}` | `{"token", "returningAttendee"}` |
+| POST | `/api/attendees/scan` | `{"linkedinUrl"}` | `{"status", "token", "rescanId", "returningAttendee"}` |
+
+`status` is `ISSUED` (new person, or a re-scan of someone who never opened their page: `token` is ready to show) or `AWAITING_CONFIRMATION` (their page is already open on a phone: no token, the station polls `rescanId` until the moderator answers; see [Re-scan](#re-scan-confirmation)). `returningAttendee` is true if they already filled in their name.
 
 ### Attendee (token in the URL + session cookie after first open)
 
@@ -49,11 +51,25 @@ Backend features complete and manually tested (16 test groups passing). Remainin
 | Method | URL | Returns |
 |---|---|---|
 | GET | `/api/admin/attendees` | Everyone, including hidden and unfinished: `adminId`, name, message, link, status, flagCount, joinedAt |
-| GET | `/api/admin/stats` | `{"joined", "completed", "flagged", "pendingReview"}` |
+| GET | `/api/admin/stats` | `{"joined", "completed", "flagged", "pendingReview", "pendingRescans"}` |
 | POST | `/api/admin/attendees/{adminId}/flag` | 204 |
 | POST | `/api/admin/attendees/{adminId}/approve` | 204 (works for FLAGGED and PENDING_REVIEW) |
 | DELETE | `/api/admin/attendees/{adminId}` | 204 |
 | POST | `/api/admin/reset` | 204 |
+| GET | `/api/admin/rescans` | Re-scans waiting for an answer, oldest first: `rescanId`, `adminId`, name, link, status, requestedAt |
+| GET | `/api/admin/rescans/{rescanId}` | One re-scan (the station polls this): `status` `WAITING` / `CONFIRMED` / `REJECTED` / `EXPIRED`; `token` only when `CONFIRMED` |
+| POST | `/api/admin/rescans/{rescanId}/confirm` | 204: new token issued, old session closed. 409 if already answered or expired |
+| POST | `/api/admin/rescans/{rescanId}/reject` | 204: nothing changes for the attendee. 409 if already answered or expired |
+
+### Re-scan confirmation
+
+Scanning someone whose page is already open doesn't kill that page straight away: it could be a stranger with a photo of their LinkedIn QR.
+
+- The scan returns `AWAITING_CONFIRMATION` and a `rescanId`; the dashboard sees it in `/api/admin/rescans` and `pendingRescans` goes up (show a popup when > 0).
+- **Confirm**: the station's poll returns `CONFIRMED` with the new token. The old token and wristband stop working: the old page gets **410** with "A new session was started with your LinkedIn profile...". The new token opens a fresh page with the profile kept, so the form is skipped. Flags and status are kept too.
+- **Reject**, or no answer within `one2many.moderation.rescan-timeout-seconds` (default 120, then `EXPIRED`): nothing changes, the original phone keeps working.
+- Scanning the same person again while a re-scan is waiting returns the **same** `rescanId`.
+- The timeout is checked lazily, whenever a re-scan is looked at (poll, list, stats, next scan); no background timer.
 
 ### Status codes
 
@@ -66,16 +82,17 @@ All errors return `{"error": "..."}`, translated. Validation errors also include
 | 401 | Not logged in, or wrong password. Comes from Spring Security, **empty body** |
 | 403 | Missing or wrong session cookie |
 | 404 | Unknown token, or unknown attendee (admin) |
-| 409 | Token already used by another phone |
+| 409 | Token already used by another phone, or re-scan already answered / expired |
+| 410 | Old token replaced by a confirmed re-scan ("A new session was started...") |
 | 422 | Inappropriate language, or resubmitting unchanged text while flagged |
 | 500 | Unexpected error. Generic message only; details go to the server log |
 
 ## Security design
 
-- **Only LinkedIn profile URLs accepted** at scan-in (`^https://(www\.)?linkedin\.com/in/.+$`). Stops random or malicious QR codes, since the link is later shown to every attendee.
+- **Only LinkedIn profile URLs accepted** at scan-in (`^https://(www\.)?linkedin\.com/(in|qr)/[A-Za-z0-9_%\-]+/?(\?[^\s#]*)?$`). Both LinkedIn QR formats pass: `https://www.linkedin.com/in/someone?fromQR=1` and `https://www.linkedin.com/qr/AbCdEf123`. The query is dropped and `/in/` names are lowercased, but `/qr/` tokens keep their exact case (they are case-sensitive). Stops random or malicious QR codes, since the link is later shown to every attendee. A relaxed fallback pattern (any `linkedin.com` subdomain and path) is commented out in `ScanInRequest`.
 - **Single-use token**: each scan creates a random UUID that goes into the attendee's personal QR. The first open redeems it; any other phone opening it later gets 409.
 - **Session cookie ("wristband")**: the first open also issues a second secret as an HttpOnly, SameSite=Lax cookie (12h). `/profile` and `/list` require it, so a photographed token alone can't open, edit or read anything, and the real attendee can refresh freely. Constant-time comparison; first open is `synchronized` against two phones racing.
-- **Re-scan to recover**: a lost page means coming back to the station. Re-scanning issues a new token and kills the old token and cookie. The LinkedIn scan is the only identity check.
+- **Re-scan to recover**: a lost page means coming back to the station. If the page was never opened, re-scanning issues a new token straight away. If it is open on a phone, the moderator must confirm first (see [Re-scan confirmation](#re-scan-confirmation)); once confirmed, the old token and cookie are dead and return 410. The LinkedIn scan is the only identity check, which is why an open page isn't replaced without a human looking.
 - **Station login**: `/scan` and `/api/admin/**` need the admin role (Spring Security). Anything not explicitly opened requires login. Password never in code or config: random in dev, `SPRING_SECURITY_USER_PASSWORD` environment variable at the event. IP-based restriction rejected: through a tunnel, every request appears to come from the laptop itself.
 - **CSRF**: disabled; protection comes from SameSite cookies (staff session `Strict`, wristband `Lax`).
 - **Hold-to-reveal** (station screen, not built yet): the personal QR is only visible while the attendee holds the spacebar or the left mouse button. Max 2–3 reveals or 3 minutes. The scanner won't accept the next person until the current QR has been revealed at least once.
@@ -111,6 +128,7 @@ Backend messages in English (default), Spanish and Galician: `messages.propertie
 | `server.servlet.session.cookie.secure` | Same, for the staff login cookie |
 | `one2many.host.name` / `linkedin-url` / `message` | Host card |
 | `one2many.moderation.flags-before-review` | Flag number from which fixes need approval (default 3) |
+| `one2many.moderation.rescan-timeout-seconds` | Seconds the moderator has to answer a re-scan before it expires (default 120) |
 | `spring.security.user.name` / `roles` | Admin user. Password from the environment variable only |
 | `logging.file.name`, `logging.threshold.file`, `logging.logback.rollingpolicy.max-history` | Persistent log |
 
@@ -147,7 +165,7 @@ Restarting (including DevTools' automatic restart when a file is saved) **wipes 
 9. Use a made-up token → 404
 10. Same with `Accept-Language: es` / `gl` → translated error
 11. Two people: each sees the other in the list, not themselves
-12. Re-scan the same person → new token, `returningAttendee: true`, old token gives 404, new token skips the form
+12. Re-scan the same person → page never opened: new token at once; page open: `AWAITING_CONFIRMATION` until the moderator confirms → new token, `returningAttendee: true`, old token gives 410, new token skips the form
 13. Session cookie: real phone opens and refreshes (200, same cookie); stranger opening → 409; stranger editing or reading, with no cookie or a fake one → 403
 14. Station login: scan without login or with wrong password → 401; correct password → 200; attendee side still open
 15. Moderation: flag → hidden from others; fixes after flags 1–2 → visible; fix after flag 3 → pending; approve, remove, reset all work; log summary shows correct totals
@@ -174,7 +192,7 @@ Restarting (including DevTools' automatic restart when a file is saved) **wipes 
 - [ ] CORS locked to the tunnel URL, not `*`
 - [ ] Decide: should profanity rejections be logged on purpose?
 - [ ] Tidy-up: move all `one2many.*` settings into a `@ConfigurationProperties` class
-- [ ] Turn the manual checklist into automated tests (JUnit + MockMvc)
+- [x] Turn the manual checklist into automated tests (JUnit + MockMvc): `gradlew.bat test`, 60 tests
 
 ### Frontend (Vue)
 - [ ] Station screen (second monitor): advert, instructions, hold-to-reveal (spacebar or left mouse button), scanner lock until revealed
