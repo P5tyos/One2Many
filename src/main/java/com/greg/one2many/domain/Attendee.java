@@ -11,13 +11,12 @@ import java.time.Instant;
 @AllArgsConstructor
 public class Attendee {
 
-    private String id;            // internal random UUID — single-use security token,
-                                   // embedded in the personal QR / page URL
+    private String id;            // single-use token, embedded in the personal QR
     private String linkedinUrl;   // normalised, unique — the attendee's real identity
-    private String name;          // required, filled in on their personal landing page
-    private String message;       // optional, short intro (~100 chars)
-    private boolean flagged;      // true = hidden from public list until they edit & resubmit
-    private boolean redeemed;     // true once the personal page has been opened once —
-                                   // blocks reuse of a captured/photographed QR code
-    private Instant joinedAt;     // when they first scanned in at the station
+    private String name;
+    private String message;
+    private boolean flagged;      // hidden from the list by a moderator
+    private boolean redeemed;     // true once the personal page has been opened once
+    private Instant joinedAt;
+    private String sessionSecret; // the "wristband": issued on first open, sent as a cookie
 }
