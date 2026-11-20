@@ -272,6 +272,22 @@ public class AttendeeService {
     }
 
     private String normalize(String linkedinUrl) {
-        return linkedinUrl.trim().toLowerCase().replaceAll("/+$", "");
+        String noQuery = linkedinUrl.trim().split("[?#]", 2)[0].replaceAll("/+$", ""); // drop ?fromQR=1 and similar
+        noQuery = noQuery.replaceFirst("(?i)^http://", "https://"); // relaxed mode may let http in
+        int pathStart = noQuery.indexOf('/', "https://".length());
+        if (pathStart < 0) {
+            return noQuery.toLowerCase(); // no path (e.g. host card not configured)
+        }
+        // the domain is never case-sensitive; /in/ names aren't either;
+        // /qr/ tokens ARE (tested 20 Nov: lowercased token -> page not found)
+        String domain = noQuery.substring(0, pathStart).toLowerCase();
+        if (domain.endsWith(".linkedin.com") || domain.equals("https://linkedin.com")) {
+            domain = "https://www.linkedin.com"; // es./m./no prefix -> the same person, standard link
+        }
+        String path = noQuery.substring(pathStart);
+        if (path.toLowerCase().startsWith("/in/")) {
+            path = path.toLowerCase();
+        }
+        return domain + path;
     }
 }
