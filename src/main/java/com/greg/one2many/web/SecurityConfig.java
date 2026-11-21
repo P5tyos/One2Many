@@ -28,7 +28,7 @@ public class SecurityConfig {
                 // everything else (future dashboard etc.): login required
                 .anyRequest().authenticated()
             )
-            .formLogin(form -> form.defaultSuccessUrl("/station", true)) // true = always, ignore remembered pages   // login page for the station's browser
+            .formLogin(form -> form.defaultSuccessUrl("/dashboard", true)) // true = always, ignore remembered pages; the dashboard links to the station   // login page for the station's browser
             .httpBasic(Customizer.withDefaults());  // username:password for curl testing
         return http.build();
     }

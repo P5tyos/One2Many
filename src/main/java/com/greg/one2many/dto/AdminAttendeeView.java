@@ -18,4 +18,6 @@ public class AdminAttendeeView {
     private boolean profileComplete;
     private boolean pageOpened;     // their phone has opened the page (wristband handed out)
     private Instant joinedAt;
+    private boolean possibleHiddenWord; // dashboard: yellow row until the moderator accepts it
+    private Instant hiddenSince;        // dashboard: "hidden for 4 min"; null while visible
 }

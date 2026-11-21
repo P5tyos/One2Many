@@ -54,6 +54,24 @@ public class ProfanityService {
         return false;
     }
 
+    // Dashboard hint only (yellow row), never blocks anything: is a blocked word hidden INSIDE
+    // a longer word, e.g. "knFuckow" or "HelloM1erdaCaca"? Spaces are removed and the text is
+    // searched for any blocked term of 4+ letters. Short terms are skipped: "ano", "culo"...
+    // would light up half the names in Spain ("Fernando"...).
+    public boolean containsHiddenProfanity(String text) {
+        if (text == null || text.isBlank() || containsProfanity(text)) {
+            return false;
+        }
+        String squashed = normalize(text).replace(" ", "");
+        for (String term : blockedTerms) {
+            String t = term.replace(" ", "");
+            if (t.length() >= 4 && squashed.contains(t)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private String normalize(String input) {
         // NFC first: some phones send ñ as two characters (n + ~); this joins them into one
         String lower = Normalizer.normalize(input, Normalizer.Form.NFC).toLowerCase();

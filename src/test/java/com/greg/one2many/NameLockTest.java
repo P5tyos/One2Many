@@ -167,6 +167,32 @@ class NameLockTest extends ApiTestSupport {
         }
 
         @Test
+        void adminSetNameThatTheFilterCatchesDoesNotBlockLaterSaves() throws Exception {
+            // "Ano" is on the Spanish word list: a false positive the moderator can type, the attendee can't
+            Phone p = new Phone(uniqueUrl("ano")).joinAs("Anna", "first message");
+            assertThat(renameTo(p.adminId(), "Ano Pérez")).isEqualTo(204);
+
+            // the attendee can still update their message (the stored name is not re-checked)
+            MvcResult r = p.submit("Ano Pérez", "second message");
+            assertThat(r.getResponse().getStatus()).as(body(r)).isEqualTo(200);
+            assertThat(read(body(r), "$.name", String.class)).isEqualTo("Ano Pérez");
+            assertThat(read(body(r), "$.message", String.class)).isEqualTo("second message");
+
+            // ...whatever name the phone sends
+            MvcResult r2 = p.submit("Anna", "third message");
+            assertThat(r2.getResponse().getStatus()).isEqualTo(200);
+            assertThat(read(body(r2), "$.name", String.class)).isEqualTo("Ano Pérez");
+
+            // the message is still checked
+            assertThat(p.submit("Ano Pérez", "mierda").getResponse().getStatus()).isEqualTo(422);
+            assertThat(read(body(p.refresh()), "$.message", String.class)).isEqualTo("third message");
+
+            // and the attendee still can't type that name themselves on a first save
+            Phone q = new Phone(uniqueUrl("ano2")).join();
+            assertThat(q.submit("Ano Pérez", "").getResponse().getStatus()).isEqualTo(422);
+        }
+
+        @Test
         void nameIsTrimmed() throws Exception {
             Phone alice = new Phone(uniqueUrl("alice")).joinAs("Alcie", "");
             assertThat(renameTo(alice.adminId(), "   Alice   ")).isEqualTo(204);

@@ -122,29 +122,29 @@ class StationApiTest extends ApiTestSupport {
 
     // ======================================================================
     @Nested
-    @DisplayName("H. Station form login")
+    @DisplayName("H. Staff form login")
     class FormLogin {
 
         @Test
-        void successfulLoginRedirectsToStation() throws Exception {
+        void successfulLoginRedirectsToDashboard() throws Exception {
             mvc.perform(formLogin().user("admin").password("test"))
                     .andExpect(status().is3xxRedirection())
-                    .andExpect(redirectedUrl("/station"));
+                    .andExpect(redirectedUrl("/dashboard"));
         }
 
         @Test
-        void redirectsToStationEvenIfAnotherPageWasRequestedFirst() throws Exception {
-            // the browser first asks for a protected page and gets sent to the login form...
+        void redirectsToDashboardEvenIfAnotherPageWasRequestedFirst() throws Exception {
+            // the browser first asks for another protected page and gets sent to the login form...
             MockHttpSession session = new MockHttpSession();
-            mvc.perform(get("/dashboard").session(session).accept(MediaType.TEXT_HTML))
+            mvc.perform(get("/station").session(session).accept(MediaType.TEXT_HTML))
                     .andExpect(status().is3xxRedirection());
-            // ...but after logging in it still lands on /station (defaultSuccessUrl(..., true))
+            // ...but after logging in it still lands on /dashboard (defaultSuccessUrl(..., true))
             mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/login")
                             .session(session)
                             .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                             .param("username", "admin")
                             .param("password", "test"))
-                    .andExpect(redirectedUrl("/station"));
+                    .andExpect(redirectedUrl("/dashboard"));
         }
 
         @Test

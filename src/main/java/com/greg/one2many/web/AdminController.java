@@ -3,8 +3,11 @@ package com.greg.one2many.web;
 import com.greg.one2many.dto.AdminAttendeeView;
 import com.greg.one2many.dto.AdminRenameRequest;
 import com.greg.one2many.dto.AdminStats;
+import com.greg.one2many.dto.EventInfo;
+import com.greg.one2many.dto.EventUpdateRequest;
 import com.greg.one2many.dto.RescanView;
 import com.greg.one2many.service.AttendeeService;
+import com.greg.one2many.service.EventService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +22,7 @@ import java.util.Map;
 public class AdminController {
 
     private final AttendeeService attendeeService;
+    private final EventService eventService;
 
     @GetMapping("/attendees")
     public List<AdminAttendeeView> listAll() {
@@ -42,6 +46,19 @@ public class AdminController {
                                        @Valid @RequestBody AdminRenameRequest request) {
         attendeeService.renameByAdmin(adminId, request.getName());
         return ResponseEntity.noContent().build();
+    }
+
+    // the yellow "possible hidden word" hint: moderator checked it, it's fine
+    @PostMapping("/attendees/{adminId}/accept")
+    public ResponseEntity<Void> acceptText(@PathVariable("adminId") String adminId) {
+        attendeeService.acceptText(adminId);
+        return ResponseEntity.noContent().build();
+    }
+
+    // edit the event details on the fly (station advert + phone page pick them up)
+    @PutMapping("/event")
+    public EventInfo updateEvent(@Valid @RequestBody EventUpdateRequest request) {
+        return eventService.update(request);
     }
 
     // works for both FLAGGED and PENDING_REVIEW: makes them visible again

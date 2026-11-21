@@ -11,7 +11,7 @@
 //                                                         └─REJECTED/EXPIRED──▶ message
 //   message ──after a few seconds──▶ idle
 // ─────────────────────────────────────────────────────────────────────────────
-import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import QRCode from 'qrcode'
 import { api } from '@/api'
 import logoHeader from '@/assets/brand/logo-header.png'
@@ -22,6 +22,8 @@ import bgBlobs from '@/assets/brand/bg-blobs.png'
 const MAX_REVEALS = 3 // how many times the QR can be shown per person
 const REVEAL_WINDOW_MS = 3 * 60 * 1000 // ...within 3 minutes
 const MESSAGE_MS = 4000 // how long info/error messages stay up
+const HEARTBEAT_MS = 4000 // mirror: tell the dashboard "still here" this often
+const MANUAL_POLL_MS = 1500 // dashboard's manual add: how often the station checks for a link
 const OPENED_POLL_MS = 1500 // how often the station asks "has their phone opened it?"
 const SCANNER_MAX_GAP_MS = 150 // scanner keys come fast (Shift+key for : / ? adds delay); humans are slower
 const SCANNER_MIN_LENGTH = 20 // a LinkedIn link is always longer than this
@@ -96,16 +98,16 @@ function forgetPerson() {
 
 // ---- the lock: can a new person be scanned right now? ----
 function canAcceptScan() {
-  if (state.value === 'idle' || state.value === 'message') return true
-  // the current person must have seen their code at least once (Greg's rule)
-  if (state.value === 'ready' && revealsUsed.value > 0) return true
-  return false
+  // Locked while someone's code is pending. It frees itself when their phone opens the page
+  // (auto), when the 3 reveals are used up, when the 3 minutes run out, or with "Cancelar".
+  // (The old rule "free after the first reveal" was from before we could detect the opening.)
+  return state.value === 'idle' || state.value === 'message'
 }
 
 // ---- scanning ----
 async function submitScan(url) {
   if (!canAcceptScan()) {
-    noteForStaff('Bloqueado: la persona anterior aún no ha mostrado su código')
+    noteForStaff('Bloqueado: la persona anterior aún no ha abierto su página (o pulsa Cancelar)')
     return
   }
   clearTimer('message') // a message's "back to idle" timer must not fire mid-flow
@@ -164,6 +166,7 @@ async function startReady(token) {
     color: { dark: '#000000', light: '#ffffff' },
   })
   state.value = 'ready'
+  windowEndsAt = Date.now() + REVEAL_WINDOW_MS
   secondsLeft.value = REVEAL_WINDOW_MS / 1000
   timers.tick = setInterval(() => (secondsLeft.value = Math.max(0, secondsLeft.value - 1)), 1000)
   // as soon as their phone opens the page, we're done: close the QR, free the station
@@ -184,6 +187,12 @@ async function startReady(token) {
   }, REVEAL_WINDOW_MS)
 }
 
+// the person changed their mind / something went wrong: forget them, back to the advert
+function cancelCurrent() {
+  forgetPerson()
+  state.value = 'idle'
+}
+
 function startReveal() {
   if (state.value === 'ready' && revealsLeft.value > 0) state.value = 'revealing'
 }
@@ -192,7 +201,8 @@ function stopReveal() {
   if (state.value !== 'revealing') return
   revealsUsed.value++
   if (revealsLeft.value <= 0) {
-    showMessage('Disfruta del evento.', 'info') // neutral: we don't know if their phone opened it
+    // 3 reveals used and the phone never opened the page (otherwise we'd have left already)
+    showMessage('No se ha abierto en tu móvil. Vuelve a escanear tu QR de LinkedIn.', 'info')
   } else {
     state.value = 'ready'
   }
@@ -251,12 +261,44 @@ function submitManual() {
   submitScan(manualUrl.value)
 }
 
+// ---- mirror for the dashboard: report what's on screen (never the QR or token) ----
+let windowEndsAt = null
+async function reportState() {
+  try {
+    await api('/api/admin/station/state', {
+      method: 'POST',
+      body: {
+        state: state.value,
+        revealsLeft: revealsLeft.value,
+        windowEndsAt: state.value === 'ready' || state.value === 'revealing' ? windowEndsAt : null,
+        message: state.value === 'message' ? message.value.text : null,
+        messageKind: state.value === 'message' ? message.value.kind : null,
+        staffNote: staffNote.value?.text ?? null,
+      },
+    })
+  } catch {
+    // not logged in / offline: the dashboard will show "station not connected"
+  }
+}
+watch([state, revealsLeft, message, staffNote], reportState)
+
+// ---- manual add from the dashboard: same flow as a scan ----
+async function checkDashboardManual() {
+  try {
+    const r = await api('/api/admin/station/manual')
+    if (r?.linkedinUrl) submitScan(r.linkedinUrl) // the lock still applies, like a real scan
+  } catch {
+    // not logged in / offline: loadStats shows the banner
+  }
+}
+
 // ---- background data: event info + counter ----
 async function loadStats() {
   try {
     const stats = await api('/api/admin/stats')
     joined.value = stats.joined
     needsLogin.value = false
+    event.value = await api('/api/event') // Greg may edit the event details on the dashboard
   } catch (e) {
     if (e.status === 401) needsLogin.value = true
   }
@@ -274,6 +316,9 @@ onMounted(async () => {
   }
   loadStats()
   timers.stats = setInterval(loadStats, STATS_POLL_MS)
+  timers.manualDash = setInterval(checkDashboardManual, MANUAL_POLL_MS)
+  timers.heartbeat = setInterval(reportState, HEARTBEAT_MS)
+  reportState()
 })
 
 onBeforeUnmount(() => {
@@ -358,9 +403,11 @@ const timeLeftText = computed(() => {
     <section v-if="state === 'ready'" class="ready">
       <div class="card ready-card">
         <h1>Tu código personal está listo</h1>
+        <!-- three fixed lines, so the two yellow keys sit under each other and never break -->
         <p class="big">
-          Mantén pulsada la <kbd>barra espaciadora</kbd> o el <kbd>botón del ratón</kbd> para
-          mostrarlo
+          Mantén pulsada la <kbd>barra espaciadora</kbd><br />
+          o el <kbd>botón del ratón</kbd> en cualquier parte<br />
+          para mostrarlo
         </p>
         <p class="camera-tip">📷 Escanéalo con la <strong>cámara del móvil</strong>, no con la app de LinkedIn</p>
         <p class="meta">
@@ -368,6 +415,9 @@ const timeLeftText = computed(() => {
           {{ timeLeftText }}
         </p>
       </div>
+      <!-- small, at the bottom of the screen: not an option the attendee should think about.
+           .stop: a click here must not count as "hold the mouse to reveal" -->
+      <button class="cancel-btn" @pointerdown.stop @click="cancelCurrent">Cancelar</button>
     </section>
 
     <!-- ===== REVEALING: navy full screen, QR in the middle ===== -->
@@ -398,7 +448,7 @@ const timeLeftText = computed(() => {
 
     <!-- ===== manual entry (organiser) ===== -->
     <button
-      v-if="!manualOpen && state !== 'revealing'"
+      v-if="!manualOpen && (state === 'idle' || state === 'message')"
       class="manual-toggle"
       title="Introducir enlace a mano"
       @pointerdown.stop
@@ -411,7 +461,7 @@ const timeLeftText = computed(() => {
       <small v-if="staffNote.detail">{{ staffNote.detail }}</small>
     </div>
     <form
-      v-if="manualOpen"
+      v-if="manualOpen && (state === 'idle' || state === 'message')"
       class="manual card"
       @pointerdown.stop
       @submit.prevent="submitManual"
@@ -680,6 +730,27 @@ kbd {
   display: block;
   font-family: monospace;
   overflow-wrap: anywhere;
+}
+kbd {
+  white-space: nowrap; /* "barra espaciadora" never splits over two lines */
+}
+.cancel-btn {
+  position: fixed;
+  left: var(--space-4);
+  bottom: var(--space-4);
+  z-index: 5;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--text-muted);
+  font-weight: 600;
+  opacity: 0.6;
+  cursor: pointer;
+}
+.cancel-btn:hover {
+  opacity: 1;
 }
 .camera-tip {
   margin-top: var(--space-3);

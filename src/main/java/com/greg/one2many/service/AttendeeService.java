@@ -131,11 +131,15 @@ public class AttendeeService {
         synchronized (attendee) {
             // the name is set once, by the attendee, on the first save. After that only the
             // moderator can change it (renameByAdmin); a different name sent from the phone is ignored
-            if (attendee.getName() != null) {
+            boolean nameAlreadySet = attendee.getName() != null;
+            if (nameAlreadySet) {
                 name = attendee.getName();
             }
 
-            if (profanityService.containsProfanity(name) || profanityService.containsProfanity(message)) {
+            // the name is checked only when the attendee types it (first save); a name the
+            // moderator set is trusted, otherwise a filter false positive would block every later save
+            boolean badName = !nameAlreadySet && profanityService.containsProfanity(name);
+            if (badName || profanityService.containsProfanity(message)) {
                 throw new InappropriateContentException("profile.inappropriate");
             }
 
@@ -147,6 +151,9 @@ public class AttendeeService {
                 throw new InappropriateContentException("profile.inappropriate");
             }
 
+            if (!unchanged) {
+                attendee.setTextAccepted(false); // new text: the moderator hasn't seen this one
+            }
             attendee.setName(name);
             attendee.setMessage(message);
 
@@ -157,6 +164,7 @@ public class AttendeeService {
                             name, attendee.getFlagCount());
                 } else {
                     attendee.setStatus(AttendeeStatus.VISIBLE);
+                    attendee.setHiddenSince(null);
                 }
             }
             // PENDING_REVIEW stays pending until a moderator approves
@@ -193,7 +201,10 @@ public class AttendeeService {
                 .sorted(Comparator.comparing(Attendee::getJoinedAt))
                 .map(a -> new AdminAttendeeView(
                         a.getAdminId(), a.getName(), a.getMessage(), a.getLinkedinUrl(),
-                        a.getStatus(), a.getFlagCount(), a.getName() != null, a.isRedeemed(), a.getJoinedAt()))
+                        a.getStatus(), a.getFlagCount(), a.getName() != null, a.isRedeemed(), a.getJoinedAt(),
+                        !a.isTextAccepted() && (profanityService.containsHiddenProfanity(a.getName())
+                                || profanityService.containsHiddenProfanity(a.getMessage())),
+                        a.getHiddenSince()))
                 .collect(Collectors.toList());
     }
 
@@ -210,7 +221,8 @@ public class AttendeeService {
                 countWhere(a -> a.getName() != null),
                 countWhere(a -> a.getStatus() == AttendeeStatus.FLAGGED),
                 countWhere(a -> a.getStatus() == AttendeeStatus.PENDING_REVIEW),
-                listWaitingRescans().size());
+                listWaitingRescans().size(),
+                totalJoined.get());
     }
 
     public void flag(String adminId) {
@@ -219,6 +231,9 @@ public class AttendeeService {
         synchronized (attendee) {
             attendee.setStatus(AttendeeStatus.FLAGGED);
             attendee.setFlagCount(attendee.getFlagCount() + 1);
+            if (attendee.getHiddenSince() == null) {
+                attendee.setHiddenSince(Instant.now()); // flagged again while hidden: keep the first time
+            }
         }
         log.warn("Moderator flagged '{}' (flag {}, manual review from flag {})",
                 attendee.getName(), attendee.getFlagCount(), flagsBeforeReview);
@@ -234,9 +249,18 @@ public class AttendeeService {
         }
     }
 
+    // moderator looked at a yellow "possible hidden word" row and says it's fine
+    public void acceptText(String adminId) {
+        Attendee attendee = findByAdminId(adminId);
+        attendee.setTextAccepted(true);
+        log.warn("Moderator accepted the text of '{}'", attendee.getName());
+    }
+
     public void approve(String adminId) {
         Attendee attendee = findByAdminId(adminId);
+        attendee.setTextAccepted(true); // approving means the text is fine too
         attendee.setStatus(AttendeeStatus.VISIBLE);
+        attendee.setHiddenSince(null);
         log.warn("Moderator approved '{}'", attendee.getName());
     }
 

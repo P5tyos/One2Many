@@ -13,7 +13,7 @@ const REFRESH_MS = 20000 // new people keep arriving: refresh the list this ofte
 const SAVED_BANNER_MS = 5000
 const NAME_MAX = 60 // same limits as the backend (ProfileDetailsRequest)
 const MESSAGE_MAX = 100
-const VISITED_KEY = 'o2m_visited' // remembered on this phone only
+const SEARCH_FROM = 6 // show the search box once the list is this long
 // soft tones for the initials avatars (rounded squares), picked by name so each person keeps theirs
 const TONES = ['var(--coral-soft)', 'var(--teal-soft)', 'var(--yellow-soft)', 'var(--purple-soft)', 'var(--primary-soft)']
 
@@ -31,6 +31,8 @@ const justSaved = ref(false)
 
 // ---- visited people (who they already opened) ----
 // Browser storage can be missing (private mode...): then visited marks just last until reload.
+// one list per personal page (token), so two people testing on one browser don't share it
+const VISITED_KEY = `o2m_visited_${props.token}`
 function loadVisited() {
   try {
     return new Set(JSON.parse(localStorage.getItem(VISITED_KEY)) || [])
@@ -47,8 +49,25 @@ function markVisited(person) {
     // no storage: fine
   }
 }
-const toVisit = computed(() => people.value.filter((p) => !visited.value.has(p.linkedinUrl)))
-const alreadyVisited = computed(() => people.value.filter((p) => visited.value.has(p.linkedinUrl)))
+// sentences shown in full (tapped open); the rest show one line
+const expanded = ref(new Set())
+function toggleExpanded(person) {
+  if (expanded.value.has(person.linkedinUrl)) expanded.value.delete(person.linkedinUrl)
+  else expanded.value.add(person.linkedinUrl)
+}
+
+// search: case- and accent-insensitive ("lucia" finds "Lucía"), by name or intro
+const query = ref('')
+function plain(text) {
+  return (text ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+const shown = computed(() => {
+  const q = plain(query.value.trim())
+  if (!q) return people.value
+  return people.value.filter((p) => plain(p.name).includes(q) || plain(p.message).includes(q))
+})
+const toVisit = computed(() => shown.value.filter((p) => !visited.value.has(p.linkedinUrl)))
+const alreadyVisited = computed(() => shown.value.filter((p) => visited.value.has(p.linkedinUrl)))
 
 // ---- small helpers for the cards ----
 function initials(name) {
@@ -117,6 +136,7 @@ async function refresh() {
   try {
     me.value = await api(`/api/attendees/${props.token}`)
     await loadList()
+    event.value = await api('/api/event') // Greg may have edited the event details
   } catch (e) {
     if (ENDS_PAGE.includes(e.status)) fail(e)
     // anything else (bad signal for a moment): try again next round
@@ -271,47 +291,66 @@ onBeforeUnmount(() => {
       <section>
         <h2 class="section-title">Así te ven los demás</h2>
         <div class="person card me-card">
-          <span class="avatar" :style="{ background: tone(me.name) }">{{ initials(me.name) }}</span>
-          <div class="person-body">
+          <div class="person-head">
+            <span class="avatar" :style="{ background: tone(me.name) }">{{ initials(me.name) }}</span>
             <strong class="person-name">{{ me.name }}</strong>
-            <p v-if="me.message" class="person-msg">{{ me.message }}</p>
+            <button class="btn btn-secondary btn-small" @click="startForm">Editar</button>
           </div>
-          <button class="btn btn-secondary btn-small" @click="startForm">Editar</button>
+          <p v-if="me.message" class="person-msg open">{{ me.message }}</p>
         </div>
       </section>
+
+      <input
+        v-if="people.length >= SEARCH_FROM"
+        v-model="query"
+        type="search"
+        class="search"
+        placeholder="🔍 Buscar por nombre o frase"
+        aria-label="Buscar"
+      />
 
       <section>
         <h2 class="section-title">
           Por conocer <span class="count">{{ toVisit.length }}</span>
         </h2>
         <p v-if="toVisit.length" class="muted hint">
-          Toca a alguien para abrir su LinkedIn y conectar.
+          Toca el nombre para abrir su LinkedIn · toca la frase para leerla entera.
         </p>
         <p v-else class="muted empty">
           {{
-            people.length
-              ? '¡Ya has visitado a todos! Vuelve en un rato: sigue llegando gente.'
-              : 'Aún no hay nadie más. ¡Vuelve en un rato!'
+            query.trim()
+              ? 'Nadie coincide con tu búsqueda.'
+              : people.length
+                ? '¡Ya has visitado a todos! Vuelve en un rato: sigue llegando gente.'
+                : 'Aún no hay nadie más. ¡Vuelve en un rato!'
           }}
         </p>
         <ul class="people">
           <li v-for="p in toVisit" :key="p.linkedinUrl">
-            <a
-              class="person card"
-              :href="p.linkedinUrl"
-              target="_blank"
-              rel="noopener"
-              @click="markVisited(p)"
-            >
-              <span class="avatar" :style="{ background: tone(p.name) }">{{ initials(p.name) }}</span>
-              <div class="person-body">
+            <div class="person card">
+              <a
+                class="person-head"
+                :href="p.linkedinUrl"
+                target="_blank"
+                rel="noopener"
+                @click="markVisited(p)"
+              >
+                <span class="avatar" :style="{ background: tone(p.name) }">{{ initials(p.name) }}</span>
                 <strong class="person-name">
                   {{ p.name }} <span v-if="p.host" class="badge">Anfitrión</span>
                 </strong>
-                <p v-if="p.message" class="person-msg">{{ p.message }}</p>
-              </div>
-              <span class="go" aria-hidden="true">↗</span>
-            </a>
+                <span class="go" aria-hidden="true">↗</span>
+              </a>
+              <!-- tap the sentence to read it all (phones have no hover) -->
+              <p
+                v-if="p.message"
+                class="person-msg"
+                :class="{ open: expanded.has(p.linkedinUrl) }"
+                @click="toggleExpanded(p)"
+              >
+                {{ p.message }}
+              </p>
+            </div>
           </li>
         </ul>
       </section>
@@ -322,16 +361,30 @@ onBeforeUnmount(() => {
         </h2>
         <ul class="people">
           <li v-for="p in alreadyVisited" :key="p.linkedinUrl">
-            <a class="person visited" :href="p.linkedinUrl" target="_blank" rel="noopener">
-              <span class="avatar">{{ initials(p.name) }}</span>
-              <div class="person-body">
+            <div class="person visited">
+              <a
+                class="person-head"
+                :href="p.linkedinUrl"
+                target="_blank"
+                rel="noopener"
+                @click="markVisited(p)"
+              >
+                <span class="avatar" :style="{ background: tone(p.name) }">{{ initials(p.name) }}</span>
                 <strong class="person-name">
                   {{ p.name }} <span v-if="p.host" class="badge">Anfitrión</span>
                 </strong>
-                <p v-if="p.message" class="person-msg">{{ p.message }}</p>
-              </div>
-              <span class="tag-visited">✓ Visitado</span>
-            </a>
+                <span class="tag-visited">✓ Visitado</span>
+              </a>
+              <!-- tap the sentence to read it all (phones have no hover) -->
+              <p
+                v-if="p.message"
+                class="person-msg"
+                :class="{ open: expanded.has(p.linkedinUrl) }"
+                @click="toggleExpanded(p)"
+              >
+                {{ p.message }}
+              </p>
+            </div>
           </li>
         </ul>
       </section>
@@ -548,33 +601,57 @@ section {
 }
 
 /* people cards */
+.search {
+  font: inherit;
+  font-size: 1rem; /* 16px+: no zoom on focus */
+  padding: var(--space-2) var(--space-3);
+  border: 2px solid #dfe3ee;
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--text);
+}
+.search:focus {
+  outline: none;
+  border-color: var(--primary);
+}
 .people {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 .person {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-radius: 16px;
   color: var(--text);
   text-decoration: none;
 }
-a.person.card:active {
-  transform: scale(0.98);
+/* row 1: avatar + name (+ arrow); row 2: the sentence, full width */
+.person-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text);
+  text-decoration: none;
+}
+a.person-head:active {
+  opacity: 0.7;
+}
+.person-head .person-name {
+  flex: 1;
+  min-width: 0;
 }
 .avatar {
   flex: none;
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius); /* rounded square, not a circle (Greg) */
+  width: 40px;
+  height: 40px;
+  border-radius: 10px; /* rounded square, not a circle (Greg) */
   display: grid;
   place-items: center;
   font-weight: 800;
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   color: var(--text);
 }
 .person-body {
@@ -583,13 +660,27 @@ a.person.card:active {
 }
 .person-name {
   display: block;
-  font-size: 1.05rem;
+  font-size: 1rem;
+  line-height: 1.25;
 }
 .person-msg {
-  margin: 2px 0 0;
+  margin: var(--space-1) 0 0;
+  cursor: pointer;
   color: var(--text-muted);
-  font-size: 0.92rem;
+  font-size: 0.88rem;
+  line-height: 1.3;
   overflow-wrap: anywhere;
+  /* max 2 lines, then "…" */
+  display: -webkit-box;
+  -webkit-line-clamp: 1; /* one line, then "…"; tap to open */
+  line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.person-msg.open {
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+  display: block;
 }
 .go {
   flex: none;
@@ -611,24 +702,19 @@ a.person.card:active {
   border: 2px solid #e3e9f6;
 }
 
-/* visited: softer, quieter (Greg: strong on top, light at the bottom) */
+/* visited: soft teal "success" tint, a small celebration, not a greyed-out task (Greg) */
 .person.visited {
-  background: #f3f2f7;
-  border: 1px solid #e7e5ee;
-  border-radius: var(--radius-lg);
-}
-.person.visited .avatar {
-  background: #cdd2de;
-  color: #fff;
-}
-.person.visited .person-name {
-  color: var(--text-muted);
+  background: #eaf7f3;
+  border: 1px solid #c4e8de;
 }
 .tag-visited {
   flex: none;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  font-weight: 600;
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: #d3efe7;
+  color: #23806c;
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 /* footer */
