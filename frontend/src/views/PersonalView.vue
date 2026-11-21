@@ -202,7 +202,11 @@ async function save() {
   try {
     me.value = await api(`/api/attendees/${props.token}/profile`, {
       method: 'POST',
-      body: { name: form.value.name.trim(), message: form.value.message.trim() },
+      body: {
+        name: form.value.name.trim(),
+        message: form.value.message.trim(),
+        nameWarned: !me.value?.profileComplete && nameBad.value, // → yellow row for Greg
+      },
     })
     await loadList()
     view.value = 'list'

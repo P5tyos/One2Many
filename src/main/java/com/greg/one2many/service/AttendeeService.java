@@ -126,6 +126,11 @@ public class AttendeeService {
     }
 
     public Attendee completeProfile(String token, String sessionSecret, String name, String message) {
+        return completeProfile(token, sessionSecret, name, message, false);
+    }
+
+    public Attendee completeProfile(String token, String sessionSecret, String name, String message,
+                                    boolean nameWarned) {
         Attendee attendee = requireSession(token, sessionSecret);
         name = cleanText(name);
         message = cleanText(message);
@@ -163,6 +168,9 @@ public class AttendeeService {
 
             if (!unchanged) {
                 attendee.setTextAccepted(false); // new text: the moderator hasn't seen this one
+            }
+            if (!nameAlreadySet && nameWarned) {
+                attendee.setNameWarned(true); // yellow row on the dashboard until accepted
             }
             attendee.setName(name);
             attendee.setMessage(message);
@@ -212,7 +220,8 @@ public class AttendeeService {
                 .map(a -> new AdminAttendeeView(
                         a.getAdminId(), a.getName(), a.getMessage(), a.getLinkedinUrl(),
                         a.getStatus(), a.getFlagCount(), a.getName() != null, a.isRedeemed(), a.getJoinedAt(),
-                        !a.isTextAccepted() && (profanityService.containsHiddenProfanity(a.getName())
+                        !a.isTextAccepted() && (a.isNameWarned()
+                                || profanityService.containsHiddenProfanity(a.getName())
                                 || profanityService.containsHiddenProfanity(a.getMessage())),
                         a.getHiddenSince()))
                 .collect(Collectors.toList());

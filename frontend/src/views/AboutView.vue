@@ -37,12 +37,17 @@ function back() {
     <section id="que-es" class="card">
       <h2>Qué es</h2>
       <p>
-        En un evento hablas con tres o cuatro personas; al resto solo las ves de lejos. Con One2Many
-        escaneas tu código una vez y ves en tu móvil a toda la sala, con su nombre y una frase, también
-        a quien no te atreviste a saludar. Tú decides con quién conectar, a tu ritmo.
+        En un evento quieres estar presente: escuchar las charlas, tomar un café y hablar con la gente,
+        no pasarte el rato con el móvil buscando a estas personas en LinkedIn. Pero tampoco quieres irte
+        sin conectar, o al menos sin que los demás puedan encontrarte.
+      </p>
+      <p>
+        One2Many lo resuelve con un solo escaneo: apareces en la lista del evento y ves a todos los que
+        se han unido, con su nombre y un enlace a su LinkedIn. Así conectas con quien quieras, cuando quieras,
+        incluso con aquel que estuvo ocupado todo el rato.
       </p>
       <p class="muted small">
-        Para encuentros de estudiantes, ferias de empleo, meetups, charlas y congresos.
+        Para encuentros de estudiantes, ferias de empleo, meetups, charlas, congresos y mucho más.
       </p>
     </section>
 

@@ -60,7 +60,7 @@ public class AttendeeController {
             @Valid @RequestBody ProfileDetailsRequest request) {
 
         Attendee attendee = attendeeService.completeProfile(
-                token, session, request.getName(), request.getMessage());
+                token, session, request.getName(), request.getMessage(), request.isNameWarned());
         return new PersonalPageResponse(true, attendee.getName(), attendee.getMessage(), attendee.getStatus());
     }
 

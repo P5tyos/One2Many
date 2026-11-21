@@ -12,7 +12,7 @@ const router = createRouter({
     return savedPosition || { top: 0 }
   },
   routes: [
-    { path: '/', redirect: '/about' },
+    { path: '/', redirect: '/dashboard' },
     { path: '/station', component: () => import('@/views/StationView.vue') },
     { path: '/dashboard', component: () => import('@/views/DashboardView.vue') },
     { path: '/p/:token', component: () => import('@/views/PersonalView.vue'), props: true },

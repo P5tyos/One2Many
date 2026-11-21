@@ -402,7 +402,7 @@ const timeLeftText = computed(() => {
       </div>
       <aside class="right">
         <div class="counter card">
-          <template v-if="joined > COUNTER_FROM">
+          <template v-if="joined >= COUNTER_FROM">
             <span class="counter-num">{{ joined }}</span>
             <span>personas ya se han unido</span>
           </template>
@@ -421,14 +421,15 @@ const timeLeftText = computed(() => {
     <!-- ===== READY: hold to reveal ===== -->
     <section v-if="state === 'ready'" class="ready">
       <div class="card ready-card">
-        <h1>Tu código personal está listo</h1>
-        <!-- three fixed lines, so the two yellow keys sit under each other and never break -->
-        <p class="big">
-          Mantén pulsada la <kbd>barra espaciadora</kbd><br />
-          o el <kbd>botón del ratón</kbd> en cualquier parte<br />
-          para mostrarlo
-        </p>
-        <p class="camera-tip">📷 Escanéalo con la <strong>cámara del móvil</strong>, no con la app de LinkedIn</p>
+        <p class="ready-kicker">Tu código personal está listo</p>
+        <h1>Ahora prepara tu lector de QR</h1>
+        <p class="camera-tip">📷 La <strong>cámara del móvil</strong>, no la app de LinkedIn</p>
+        <!-- where the QR will appear: same size, says what to press -->
+        <div class="hold-square">
+          <span>Mantén pulsada</span>
+          <kbd class="key-big">barra espaciadora</kbd>
+          <span>o el <kbd>botón del ratón</kbd></span>
+        </div>
         <p class="meta">
           Puedes mostrarlo {{ revealsLeft }} {{ revealsLeft === 1 ? 'vez' : 'veces' }} más ·
           {{ timeLeftText }}
@@ -627,6 +628,32 @@ const timeLeftText = computed(() => {
 }
 .ready-card h1 {
   font-size: 3rem;
+  margin: 0;
+}
+.ready-kicker {
+  margin: 0 0 var(--space-1);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+/* the size of the QR that will appear, so they know where to point the camera */
+.hold-square {
+  width: min(42vh, 380px);
+  height: min(42vh, 380px);
+  margin: var(--space-4) auto;
+  border: 4px dashed var(--primary-soft);
+  border-radius: var(--radius-lg);
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-3);
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+.key-big {
+  font-size: 1.8rem;
+  padding: var(--space-2) var(--space-5);
+  border-bottom: 4px solid var(--yellow);
 }
 .big {
   font-size: 1.8rem;
@@ -782,7 +809,7 @@ kbd {
   opacity: 1;
 }
 .camera-tip {
-  margin-top: var(--space-3);
+  margin-top: var(--space-2);
   font-size: 1.2rem;
 }
 .manual-toggle {

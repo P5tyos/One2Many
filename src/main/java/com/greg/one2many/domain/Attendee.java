@@ -25,6 +25,7 @@ public class Attendee {
     
     private boolean redeemed;     // true once the personal page has been opened once
     private boolean textAccepted; // moderator OK'd the current name + message (clears the yellow hint)
+    private boolean nameWarned;   // the phone's filter warned about the name on the first save
     private Instant joinedAt;
     private Instant hiddenSince;  // set when flagged (hidden from the lists), cleared when visible again
     private String sessionSecret; // the "wristband"

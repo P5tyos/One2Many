@@ -13,4 +13,8 @@ public class ProfileDetailsRequest {
 
     @Size(max = 100, message = "{profile.message.tooLong}")
     private String message;
+
+    // the phone's instant filter (AllProfanity) warned about the name and they saved anyway.
+    // Comes from the browser, so it can only ADD scrutiny (yellow row), never remove any.
+    private boolean nameWarned;
 }
