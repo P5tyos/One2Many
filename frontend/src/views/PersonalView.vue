@@ -10,6 +10,8 @@ import logoHeader from '@/assets/brand/logo-header.png'
 const props = defineProps({ token: { type: String, required: true } })
 
 const REFRESH_MS = 20000 // new people keep arriving: refresh the list this often
+const REFRESH_HIDDEN_MS = 5000 // while my card is hidden: notice an approval within seconds
+const TICK_MS = 5000
 const SAVED_BANNER_MS = 5000
 const NAME_MAX = 60 // same limits as the backend (ProfileDetailsRequest)
 const MESSAGE_MAX = 100
@@ -168,8 +170,13 @@ async function loadList() {
 }
 
 // quiet background refresh: new people, and my own status (the organiser may flag/approve me)
-async function refresh() {
+let lastRefresh = Date.now()
+async function refresh(force) {
   if (view.value !== 'list' || document.visibilityState !== 'visible') return
+  // every 5 s while hidden (flagged / pending), otherwise every 20 s
+  const every = me.value && me.value.status !== 'VISIBLE' ? REFRESH_HIDDEN_MS : REFRESH_MS
+  if (force !== true && Date.now() - lastRefresh < every) return
+  lastRefresh = Date.now()
   try {
     me.value = await api(`/api/attendees/${props.token}`)
     await loadList()
@@ -212,10 +219,11 @@ async function save() {
 }
 
 let refreshTimer = null
+const refreshNow = () => refresh(true)
 onMounted(async () => {
   load()
-  refreshTimer = setInterval(refresh, REFRESH_MS)
-  document.addEventListener('visibilitychange', refresh) // back to the tab = fresh list at once
+  refreshTimer = setInterval(refresh, TICK_MS)
+  document.addEventListener('visibilitychange', refreshNow) // back to the tab = fresh list at once
   try {
     event.value = await api('/api/event')
   } catch {
@@ -224,7 +232,7 @@ onMounted(async () => {
 })
 onBeforeUnmount(() => {
   clearInterval(refreshTimer)
-  document.removeEventListener('visibilitychange', refresh)
+  document.removeEventListener('visibilitychange', refreshNow)
 })
 </script>
 
@@ -309,14 +317,18 @@ onBeforeUnmount(() => {
       <div v-if="me.status === 'FLAGGED'" class="alert warn">
         <span class="alert-icon">!</span>
         <div>
-          Tu presentación está oculta: el organizador la ha marcado. Edítala para volver a
-          aparecer.
+          <strong>Tu tarjeta está oculta para los demás.</strong> El organizador ha visto algo que
+          no encaja en tu nombre o tu frase. Revisa lo que has escrito y cámbialo para volver a
+          aparecer. ¿Dudas? Acércate a la estación.
           <button class="link-btn" @click="startForm">Editar ahora</button>
         </div>
       </div>
       <div v-else-if="me.status === 'PENDING_REVIEW'" class="alert info">
         <span class="alert-icon">i</span>
-        <div>Tu cambio está pendiente de revisión. Aparecerás cuando el organizador lo apruebe.</div>
+        <div>
+          <strong>Tu cambio está pendiente de revisión.</strong> Aparecerás en cuanto el organizador
+          lo apruebe. ¿Dudas? Acércate a la estación.
+        </div>
       </div>
       <div v-else-if="justSaved" class="alert ok">
         <span class="alert-icon">✓</span>
