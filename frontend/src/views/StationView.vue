@@ -42,6 +42,10 @@ const hint = ref('') // short flash hint, e.g. "show your code first"
 const event = ref(null)
 const joined = ref(0)
 const needsLogin = ref(false)
+// QR links are built from this page's address: on localhost no phone can open them
+// (only in the built app: while developing on localhost:5173 it would just be noise)
+const onLocalhost =
+  import.meta.env.PROD && ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname)
 
 const manualOpen = ref(false)
 const manualUrl = ref('')
@@ -139,17 +143,23 @@ async function submitScan(url) {
   }
 }
 
+let rescanFailures = 0
 async function pollRescan() {
   try {
     const r = await api(`/api/admin/rescans/${rescanId}`)
+    rescanFailures = 0
     if (r.status === 'CONFIRMED') {
       clearTimer('rescan')
       await startReady(r.token)
     } else if (r.status === 'REJECTED' || r.status === 'EXPIRED') {
       showMessage('No confirmado. Habla con el organizador.', 'error')
     }
-  } catch {
-    showMessage('No confirmado. Habla con el organizador.', 'error')
+  } catch (e) {
+    // give up only if the re-scan is really gone (404) or the connection stays down (~8 s)
+    rescanFailures++
+    if (e.status === 404 || rescanFailures >= 5) {
+      showMessage('No confirmado. Habla con el organizador.', 'error')
+    }
   }
 }
 
@@ -189,6 +199,9 @@ async function startReady(token) {
 
 // the person changed their mind / something went wrong: forget them, back to the advert
 function cancelCurrent() {
+  if (state.value === 'waiting' && rescanId) {
+    api(`/api/admin/rescans/${rescanId}/reject`, { method: 'POST' }).catch(() => {})
+  }
   forgetPerson()
   state.value = 'idle'
 }
@@ -284,6 +297,7 @@ watch([state, revealsLeft, message, staffNote], reportState)
 
 // ---- manual add from the dashboard: same flow as a scan ----
 async function checkDashboardManual() {
+  if (!canAcceptScan()) return // busy: leave the link in the mailbox (it waits up to 30 s)
   try {
     const r = await api('/api/admin/station/manual')
     if (r?.linkedinUrl) submitScan(r.linkedinUrl) // the lock still applies, like a real scan
@@ -342,6 +356,10 @@ const timeLeftText = computed(() => {
     <img :src="bgBlobs" alt="" class="bg-blobs" aria-hidden="true" />
 
     <!-- staff not logged in -->
+    <div v-if="onLocalhost" class="localhost-banner">
+      ⚠ Estás en localhost: los QR personales solo funcionarán en este ordenador. Abre la estación
+      con la dirección del túnel (https://….trycloudflare.com/station).
+    </div>
     <a v-if="needsLogin" href="/login" class="login-banner" @pointerdown.stop>
       Inicia sesión de organizador para empezar →
     </a>
@@ -436,6 +454,7 @@ const timeLeftText = computed(() => {
         <h1>Un momento, por favor</h1>
         <p class="big">El organizador está confirmando</p>
       </div>
+      <button class="cancel-btn" @pointerdown.stop @click="cancelCurrent">Cancelar</button>
     </section>
 
     <!-- ===== messages (over the advert) ===== -->
@@ -700,6 +719,15 @@ kbd {
 }
 
 /* login banner */
+.localhost-banner {
+  position: relative;
+  z-index: 5;
+  padding: var(--space-2) var(--space-3);
+  text-align: center;
+  background: var(--danger-soft);
+  color: var(--text);
+  font-weight: 700;
+}
 .login-banner {
   position: relative;
   z-index: 5;

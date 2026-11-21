@@ -27,6 +27,43 @@ const form = ref({ name: '', message: '' })
 const formError = ref('')
 const fieldErrors = ref({})
 const saving = ref(false)
+
+// ---- instant language check while typing (AllProfanity, runs on the phone) ----
+// Only a first, friendly filter: anyone can bypass browser code, so the backend's own check
+// stays the real gate. Loaded only when the form opens, so the list page stays light.
+const filter = ref(null)
+async function loadFilter() {
+  if (filter.value) return
+  try {
+    const { AllProfanity } = await import('allprofanity')
+    filter.value = new AllProfanity({
+      languages: ['english', 'spanish', 'brazilian'],
+      whitelistWords: ['concha'], // a common name; allowed in the backend too (Greg, 20 Nov)
+      silent: true,
+    })
+  } catch {
+    // couldn't load: no instant check, the backend still checks on save
+  }
+}
+// the sentence is blocked; the name only gets a warning (a false alarm on a real
+// surname would otherwise lock someone out, and names can't be changed later)
+const messageBad = computed(() => !!filter.value?.check(form.value.message))
+
+// no links (same rule as the backend): their LinkedIn is already on their card.
+// The ending must be lowercase ("prácticas.Es mi sueño" is a sentence, not an address).
+// Developer words that look like addresses are fine: Node.js, Vue.js, ASP.NET, socket.io
+const LINK_START = /https?:\/\/|www\./i
+// endings that are also everyday words ("Hola.me llamo") only count before a "/"
+const LINK_ADDRESS =
+  /\b[A-Za-z0-9-]+\.((com|es|net|org|io|gal|eu|info|ly|app|link|site|online|club|shop|top|biz|xyz|tk|ru|cn|gg|cc)\b|(me|to|co|tv|gl)\/)/
+const LINK_LOOKALIKES = /asp\.net|ado\.net|vb\.net|socket\.io/gi
+function hasLink(text) {
+  const t = text ?? ''
+  return LINK_START.test(t) || LINK_ADDRESS.test(t.replace(LINK_LOOKALIKES, ' '))
+}
+const messageLink = computed(() => hasLink(form.value.message))
+const nameLink = computed(() => !me.value?.profileComplete && hasLink(form.value.name))
+const nameBad = computed(() => !!filter.value?.check(form.value.name))
 const justSaved = ref(false)
 
 // ---- visited people (who they already opened) ----
@@ -145,6 +182,7 @@ async function refresh() {
 
 // ---- the form ----
 function startForm() {
+  loadFilter()
   form.value = { name: me.value?.name ?? '', message: me.value?.message ?? '' }
   formError.value = ''
   fieldErrors.value = {}
@@ -224,6 +262,8 @@ onBeforeUnmount(() => {
           <input v-model="form.name" :maxlength="NAME_MAX" autocomplete="name" required />
         </label>
         <small class="name-note">Escríbelo con cuidado: después no se puede cambiar.</small>
+        <small v-if="nameLink" class="field-error">Sin enlaces en el nombre, por favor.</small>
+        <small v-if="nameBad" class="field-warn">¿Seguro? Tu nombre parece contener una palabra inapropiada.</small>
         <small v-if="fieldErrors.name" class="field-error">{{ fieldErrors.name }}</small>
       </template>
       <p v-else class="fixed-name"><strong>{{ me.name }}</strong></p>
@@ -241,6 +281,8 @@ onBeforeUnmount(() => {
         {{ form.message.length }}/{{ MESSAGE_MAX }}
       </div>
       <small v-if="fieldErrors.message" class="field-error">{{ fieldErrors.message }}</small>
+      <small v-if="messageLink" class="field-error">Sin enlaces, por favor: tu LinkedIn ya está en tu tarjeta.</small>
+      <small v-if="messageBad" class="field-error">Tu frase parece contener lenguaje inapropiado. Cámbiala para poder guardar.</small>
 
       <div v-if="formError" class="alert warn">
         <span class="alert-icon">!</span>
@@ -256,7 +298,7 @@ onBeforeUnmount(() => {
         >
           Cancelar
         </button>
-        <button type="submit" class="btn btn-primary" :disabled="saving || !form.name.trim()">
+        <button type="submit" class="btn btn-primary" :disabled="saving || !form.name.trim() || messageBad || messageLink || nameLink">
           {{ saving ? 'Guardando…' : 'Guardar y ver la lista' }}
         </button>
       </div>
@@ -499,6 +541,10 @@ h1 {
   color: var(--coral);
   font-weight: 700;
 }
+.field-warn {
+  color: #b5541f;
+  font-weight: 600;
+}
 .field-error {
   color: var(--danger);
   font-weight: 600;
@@ -642,6 +688,8 @@ a.person-head:active {
 .person-head .person-name {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 .avatar {
   flex: none;

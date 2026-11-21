@@ -80,6 +80,13 @@ public class AdminController {
         return Map.of("opened", attendeeService.isPageOpened(token));
     }
 
+    // emergency: forget all wristbands (see AttendeeService.releaseAllSessions)
+    @PostMapping("/release-sessions")
+    public ResponseEntity<Void> releaseSessions() {
+        attendeeService.releaseAllSessions();
+        return ResponseEntity.noContent().build();
+    }
+
     // ---------- re-scan confirmation ----------
 
     // dashboard: who is waiting for a yes/no (the popup)

@@ -25,10 +25,14 @@ public class SecurityConfig {
                 .requestMatchers("/api/attendees/**").permitAll()
                 // event info: public, shown on the station advert and the phone page
                 .requestMatchers(HttpMethod.GET, "/api/event").permitAll()
-                // everything else (future dashboard etc.): login required
+                // the Vue app's public pages and files (event mode: Spring serves the built app)
+                .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/**", "/favicon.ico",
+                        "/app-icon.png", "/about", "/p/**", "/error").permitAll()
+                // everything else, including the /station and /dashboard pages: login required
                 .anyRequest().authenticated()
             )
-            .formLogin(form -> form.defaultSuccessUrl("/dashboard", true)) // true = always, ignore remembered pages; the dashboard links to the station   // login page for the station's browser
+            // login page; afterwards always the dashboard (true = ignore remembered pages), which links to the station
+            .formLogin(form -> form.defaultSuccessUrl("/dashboard", true))
             .httpBasic(Customizer.withDefaults());  // username:password for curl testing
         return http.build();
     }

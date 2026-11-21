@@ -31,7 +31,9 @@ public class ProfanityService {
                     new ClassPathResource(file).getInputStream(), StandardCharsets.UTF_8))) {
                 reader.lines()
                         .map(this::normalize)
-                        .filter(term -> !term.isBlank())
+                        // "xxx" collapses to "x" (repeated-letter rule): it would block
+                        // "Busco trabajo x la tarde". Entries under 3 letters are skipped.
+                        .filter(term -> term.replace(" ", "").length() >= 3)
                         .forEach(blockedTerms::add);
             } catch (IOException e) {
                 throw new IllegalStateException("Could not load profanity list: " + file, e);

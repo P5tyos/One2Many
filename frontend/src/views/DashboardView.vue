@@ -194,6 +194,21 @@ async function saveEvent() {
   }
 }
 
+// ---- emergency: release all sessions (two clicks) ----
+const confirmingRelease = ref(false)
+const releaseDone = ref(false)
+async function releaseAll() {
+  if (!confirmingRelease.value) {
+    confirmingRelease.value = true
+    setTimeout(() => (confirmingRelease.value = false), 20000)
+    return
+  }
+  confirmingRelease.value = false
+  await act('/api/admin/release-sessions')
+  releaseDone.value = true
+  setTimeout(() => (releaseDone.value = false), 5000)
+}
+
 // ---- reset (new event): two clicks ----
 const confirmingReset = ref(false)
 function reset() {
@@ -420,6 +435,18 @@ onBeforeUnmount(() => {
           </button>
           <p class="muted small">Si reinicias la aplicación, vuelven los datos de application.properties.</p>
         </form>
+
+        <div class="card danger-zone">
+          <h2>Emergencia</h2>
+          <p class="muted small">
+            Si el túnel se reinicia (nueva dirección), las páginas de los móviles dejan de funcionar.
+            Esto libera todas las sesiones: cada persona vuelve a escanear y recibe su código al
+            momento, sin confirmación. Perfiles y lista se mantienen.
+          </p>
+          <button class="btn btn-secondary" @click="releaseAll">
+            {{ releaseDone ? '✓ Sesiones liberadas' : confirmingRelease ? '¿Seguro?' : 'Liberar todas las sesiones' }}
+          </button>
+        </div>
 
         <div class="card danger-zone">
           <h2>Nuevo evento</h2>

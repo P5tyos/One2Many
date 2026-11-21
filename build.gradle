@@ -35,3 +35,22 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+// ---------- one file for the event: gradlew.bat bootJar -> build/libs/one2many.jar ----------
+// Builds the Vue app (npm run build) and packs it into the jar, so the jar alone runs everything.
+// Only bootJar does this: tests and the VS Code run button stay as fast as before.
+def isWindows = System.getProperty('os.name').toLowerCase().contains('windows')
+
+tasks.register('buildFrontend', Exec) {
+	description = 'Builds the Vue app into frontend/dist'
+	workingDir = file('frontend')
+	commandLine = isWindows ? ['cmd', '/c', 'npm', 'run', 'build'] : ['npm', 'run', 'build']
+}
+
+tasks.named('bootJar') {
+	dependsOn 'buildFrontend'
+	archiveFileName = 'one2many.jar'
+	from('frontend/dist') {
+		into 'BOOT-INF/classes/static'
+	}
+}

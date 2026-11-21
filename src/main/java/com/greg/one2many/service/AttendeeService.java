@@ -127,6 +127,12 @@ public class AttendeeService {
 
     public Attendee completeProfile(String token, String sessionSecret, String name, String message) {
         Attendee attendee = requireSession(token, sessionSecret);
+        name = cleanText(name);
+        message = cleanText(message);
+        if (name == null || name.isBlank()) {
+            // e.g. only invisible characters: @NotBlank let it through, cleaning left nothing
+            throw new InappropriateContentException("profile.name.required");
+        }
 
         synchronized (attendee) {
             // the name is set once, by the attendee, on the first save. After that only the
@@ -142,7 +148,11 @@ public class AttendeeService {
             if (badName || profanityService.containsProfanity(message)) {
                 throw new InappropriateContentException("profile.inappropriate");
             }
-
+            // no links in names or sentences: their LinkedIn is already on the card,
+            // and a copied link could lead anywhere (Greg, 21 Nov)
+            if ((!nameAlreadySet && containsLink(name)) || containsLink(message)) {
+                throw new InappropriateContentException("profile.noLinks");
+            }
             boolean unchanged = Objects.equals(name, attendee.getName())
                     && Objects.equals(message, attendee.getMessage());
 
@@ -242,6 +252,10 @@ public class AttendeeService {
     // moderator corrects a typo in someone's name; their token and wristband stay the same
     public void renameByAdmin(String adminId, String newName) {
         Attendee attendee = findByAdminId(adminId);
+        newName = cleanText(newName);
+        if (newName == null || newName.isBlank()) {
+            throw new InappropriateContentException("profile.name.required");
+        }
         synchronized (attendee) {
             String oldName = attendee.getName();
             attendee.setName(newName.trim());
@@ -408,6 +422,58 @@ public class AttendeeService {
 
     private long countWhere(java.util.function.Predicate<Attendee> condition) {
         return byLinkedinUrl.values().stream().filter(condition).count();
+    }
+
+    // Invisible tricks out, visible text untouched (review, 21 Nov):
+    // - control characters (line breaks, etc.) become a space
+    // - invisible format characters go, e.g. a right-to-left override that flips the text,
+    //   EXCEPT the zero-width joiner, which emojis like 👩‍💻 need
+    // - more than 2 stacked accent marks on one letter ("zalgo" text) are cut to 2
+    // http(s)://, www., or "something.com"-style addresses (common endings only).
+    // The ending must be lowercase: real addresses are, while "prácticas.Es mi sueño" (missing
+    // space after a full stop) starts a sentence with a capital and is fine.
+    // Developer words that look like addresses are fine: Node.js, Vue.js, ASP.NET, socket.io...
+    private static final java.util.regex.Pattern LINK_START = java.util.regex.Pattern.compile(
+            "https?://|www\\.", java.util.regex.Pattern.CASE_INSENSITIVE);
+    // endings that are also everyday words ("Hola.me llamo", "DAM.to") only count before a "/"
+    private static final java.util.regex.Pattern LINK_ADDRESS = java.util.regex.Pattern.compile(
+            "\\b[A-Za-z0-9-]+\\.((com|es|net|org|io|gal|eu|info|ly|app|link|site|online"
+                    + "|club|shop|top|biz|xyz|tk|ru|cn|gg|cc)\\b|(me|to|co|tv|gl)/)");
+    private static final String LINK_LOOKALIKES = "(?i)asp\\.net|ado\\.net|vb\\.net|socket\\.io";
+
+    static boolean containsLink(String text) {
+        if (text == null || text.isBlank()) {
+            return false;
+        }
+        String withoutLookalikes = text.replaceAll(LINK_LOOKALIKES, " ");
+        return LINK_START.matcher(text).find() || LINK_ADDRESS.matcher(withoutLookalikes).find();
+    }
+
+    static String cleanText(String text) {
+        if (text == null) {
+            return null;
+        }
+        return text.replaceAll("\\p{Cc}", " ")
+                .replaceAll("[\\p{Cf}&&[^\\u200D]]", "")
+                .replaceAll("(\\p{M}{2})\\p{M}+", "$1")
+                .trim();
+    }
+
+    // Emergency (e.g. the tunnel restarted with a new address and every phone page died):
+    // forget all wristbands, so each re-scan gives a new code at once, without asking the
+    // moderator ~50 times. Profiles, flags and the list stay.
+    public void releaseAllSessions() {
+        for (Attendee attendee : byLinkedinUrl.values()) {
+            synchronized (attendee) {
+                rotateToken(attendee); // old token → "new session started" (410); wristband gone
+            }
+        }
+        rescans.values().forEach(r -> {
+            if (r.getStatus() == RescanStatus.WAITING) {
+                r.setStatus(RescanStatus.REJECTED);
+            }
+        });
+        log.warn("Moderator released all sessions ({} attendees)", byLinkedinUrl.size());
     }
 
     private boolean hostConfigured() {

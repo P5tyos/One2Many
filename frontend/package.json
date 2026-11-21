@@ -10,6 +10,7 @@
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
+    "allprofanity": "^2.4.0",
     "qrcode": "^1.5.4",
     "vue": "^3.5.42",
     "vue-router": "^5.3.1"

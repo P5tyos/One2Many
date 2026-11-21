@@ -7,6 +7,10 @@ import { createRouter, createWebHistory } from 'vue-router'
 //   /about      public info page, linked from the phone page
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
+  // a new page starts at the top; "back" returns to where you were (e.g. the phone list)
+  scrollBehavior(to, from, savedPosition) {
+    return savedPosition || { top: 0 }
+  },
   routes: [
     { path: '/', redirect: '/about' },
     { path: '/station', component: () => import('@/views/StationView.vue') },

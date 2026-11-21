@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -93,6 +94,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleEverythingElse(Exception ex) {
+        // Spring's own "you asked wrongly" errors (wrong method 405, wrong content type 415,
+        // can't answer in the format you want 406...): the client's mistake, not ours.
+        // Answer with the right status, no body, and NO log entry: otherwise anyone could fill
+        // the log file with stack traces by sending odd requests in a loop (review, 21 Nov).
+        if (ex instanceof ErrorResponse errorResponse && errorResponse.getStatusCode().is4xxClientError()) {
+            return ResponseEntity.status(errorResponse.getStatusCode()).build();
+        }
         log.error("Unexpected error", ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Map.of("error", resolve("error.generic")));
