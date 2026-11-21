@@ -16,5 +16,6 @@ public class AdminAttendeeView {
     private AttendeeStatus status;  // dashboard: FLAGGED → red, PENDING_REVIEW → popup
     private int flagCount;
     private boolean profileComplete;
+    private boolean pageOpened;     // their phone has opened the page (wristband handed out)
     private Instant joinedAt;
 }

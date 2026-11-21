@@ -6,15 +6,16 @@ A self-service networking station for events. Attendees scan their LinkedIn QR c
 
 The name is a nod to the JPA `@OneToMany` relationship: one person, many connections.
 
-## Status (20 Nov 2026)
+## Status (21 Nov 2026)
 
-Backend features complete and manually tested (16 test groups passing). Remaining backend work is hardening. Frontend not started yet.
+Backend complete: 60 automated tests passing (`gradlew.bat test`). Frontend (Vue) in progress: the station screen works end to end (login, manual entry, hold-to-reveal personal QR with logo). Next: the phone page, then the dashboard and the About page.
 
 ## Stack
 
 - Java 21, Spring Boot 4 (Gradle)
 - Spring Security, Lombok, Jakarta Validation, DevTools
-- Planned frontend: Vue
+- Frontend: Vue 3.5 + Vue Router + Vite 8, in `frontend/` (needs Node 22.18+ / 24.12+). `qrcode` npm package for the personal QR
+- Font Urbanist (Google Fonts); design tokens in `frontend/src/assets/main.css`
 - No database: everything lives in memory for the duration of the event
 
 ## Architecture
@@ -37,6 +38,12 @@ Backend features complete and manually tested (16 test groups passing). Remainin
 | POST | `/api/attendees/scan` | `{"linkedinUrl"}` | `{"status", "token", "rescanId", "returningAttendee"}` |
 
 `status` is `ISSUED` (new person, or a re-scan of someone who never opened their page: `token` is ready to show) or `AWAITING_CONFIRMATION` (their page is already open on a phone: no token, the station polls `rescanId` until the moderator answers; see [Re-scan](#re-scan-confirmation)). `returningAttendee` is true if they already filled in their name.
+
+### Event info (public)
+
+| Method | URL | Returns |
+|---|---|---|
+| GET | `/api/event` | `{"name", "date", "location", "organizers", "description", "linkedinUrl"}` from the `one2many.event.*` settings. `linkedinUrl` only passed on if it is a linkedin.com link |
 
 ### Attendee (token in the URL + session cookie after first open)
 
@@ -81,7 +88,7 @@ All errors return `{"error": "..."}`, translated. Validation errors also include
 | 400 | Validation failed (missing name, not a LinkedIn URL...) or unreadable JSON |
 | 401 | Not logged in, or wrong password. Comes from Spring Security, **empty body** |
 | 403 | Missing or wrong session cookie |
-| 404 | Unknown token, or unknown attendee (admin) |
+| 404 | Unknown token, unknown attendee (admin), or an address that doesn't exist ("Page not found", not a 500) |
 | 409 | Token already used by another phone, or re-scan already answered / expired |
 | 410 | Old token replaced by a confirmed re-scan ("A new session was started...") |
 | 422 | Inappropriate language, or resubmitting unchanged text while flagged |
@@ -127,6 +134,7 @@ Backend messages in English (default), Spanish and Galician: `messages.propertie
 | `one2many.cookie.secure` | Wristband only over HTTPS. `false` for local testing, `true` at the event |
 | `server.servlet.session.cookie.secure` | Same, for the staff login cookie |
 | `one2many.host.name` / `linkedin-url` / `message` | Host card |
+| `one2many.event.name` / `date` / `location` / `organizers` / `description` / `linkedin-url` | Event info shown on the station advert and the phone page. Copied by hand from the LinkedIn event |
 | `one2many.moderation.flags-before-review` | Flag number from which fixes need approval (default 3) |
 | `one2many.moderation.rescan-timeout-seconds` | Seconds the moderator has to answer a re-scan before it expires (default 120) |
 | `spring.security.user.name` / `roles` | Admin user. Password from the environment variable only |
@@ -141,7 +149,22 @@ If you get "permission denied": `chmod +x gradlew` once, or `bash gradlew bootRu
 
 The app runs on `http://localhost:8080`. In dev, the admin password is printed at startup ("Using generated security password"). Log in with curl using `-u admin:PASSWORD`.
 
-Restarting (including DevTools' automatic restart when a file is saved) **wipes all attendees**.
+Restarting (including DevTools' automatic restart when a file is saved) **wipes all attendees** and logs the staff out.
+
+### Frontend (development)
+
+```bash
+cd frontend
+npm install        # first time, and after new packages
+npm run dev        # http://localhost:5173
+```
+Run Spring at the same time. The Vite dev proxy forwards `/api`, `/login` and `/logout` to `:8080` with `changeOrigin: false`, so the browser sees one address: cookies work, no CORS, and Spring's redirects come back to `:5173`. Changes to `vite.config.js` need a restart of `npm run dev`; `.vue` changes appear instantly.
+
+Pages: `/station` (station screen, staff login), `/dashboard`, `/p/{token}` (phone page), `/about`. `/login` is Spring's own login page; after login it always goes to `/station`.
+
+### Tests
+
+`gradlew.bat test` (~50 s, 60 tests, test profile in `application-test.properties`). Stop the app in VS Code first: a running app can lock `build/` and the run fails with "Failed to clean up stale outputs".
 
 ## Notes and gotchas
 
@@ -151,6 +174,9 @@ Restarting (including DevTools' automatic restart when a file is saved) **wipes 
 - DevTools logs every handled exception as a warning, so they appear in the log file during development. Without DevTools (at the event) they don't.
 - VS Code warns that `one2many.*` settings are "unknown". Harmless; fixed by the `@ConfigurationProperties` tidy-up.
 - To test with curl like a phone, keep cookies in a jar file: `-c phone.txt -b phone.txt`.
+- **The LinkedIn app's own scanner refuses non-LinkedIn QR codes**, so attendees must scan their personal QR with the phone's camera. The station says so in step 3 and on the ready card. Say it out loud at the event too.
+- **Station scanner detection:** characters arriving less than 150 ms apart, then Enter, with at least 20 characters = a scan. 60 ms was too strict (Shift+key for `:` `/` `?` slows the scanner). A cut-short scan shows "Lectura incompleta"; a rejected one shows what was read ("Leído: ...") so a keyboard layout mismatch is easy to spot.
+- The station builds the personal QR from its own current address (`window.location.origin`): on `localhost` the link only works on the PC itself; through the tunnel it works on phones.
 
 ## Manual test checklist (all passed 20 Nov 2026)
 
@@ -195,7 +221,8 @@ Restarting (including DevTools' automatic restart when a file is saved) **wipes 
 - [x] Turn the manual checklist into automated tests (JUnit + MockMvc): `gradlew.bat test`, 60 tests
 
 ### Frontend (Vue)
-- [ ] Station screen (second monitor): advert, instructions, hold-to-reveal (spacebar or left mouse button), scanner lock until revealed
+- [x] Station screen (second monitor): advert, event band, instructions, hold-to-reveal (spacebar or left mouse button), scanner lock until revealed, manual entry box, re-scan waiting state, login banner (21 Nov). Scanner auto-submit to retest after the 150 ms fix
+- [ ] Rounded-square initials avatars, active/visited cards, soft alert banners (FLAGGED orange, PENDING blue, saved green), "Organizador" badge on the host card
 - [ ] Dashboard (laptop): attendee table, red rows for FLAGGED, popup when `pendingReview > 0`, flag / approve / remove / reset, joined counter
 - [ ] Personal page (phone): form, list with host card on top, visited section, FLAGGED / PENDING_REVIEW messages
 - [ ] Handle 401 by status code (empty body)
@@ -204,6 +231,8 @@ Restarting (including DevTools' automatic restart when a file is saved) **wipes 
 - [ ] Optional: projector page (advert + counter only, never a QR)
 
 ### Done
+- [x] Event info endpoint `GET /api/event` with organisers (21 Nov)
+- [x] Login always lands on `/station`; unknown addresses give 404, not 500 (21 Nov)
 - [x] Protect `/scan` (Spring Security)
 - [x] Moderator API
 - [x] Joined counter data (`/api/admin/stats`)

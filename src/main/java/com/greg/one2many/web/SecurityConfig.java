@@ -23,10 +23,12 @@ public class SecurityConfig {
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 // attendee doors: open, protected by token + wristband instead
                 .requestMatchers("/api/attendees/**").permitAll()
+                // event info: public, shown on the station advert and the phone page
+                .requestMatchers(HttpMethod.GET, "/api/event").permitAll()
                 // everything else (future dashboard etc.): login required
                 .anyRequest().authenticated()
             )
-            .formLogin(Customizer.withDefaults())   // login page for the station's browser
+            .formLogin(form -> form.defaultSuccessUrl("/station", true)) // true = always, ignore remembered pages   // login page for the station's browser
             .httpBasic(Customizer.withDefaults());  // username:password for curl testing
         return http.build();
     }

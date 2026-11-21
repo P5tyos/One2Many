@@ -1,0 +1,107 @@
+/* One2Many design tokens — palette measured from Greg's logo board (21 Nov).
+   Strong colours sparingly (buttons, small accents); "soft" tones for large areas. */
+:root {
+  --bg: #faf5ee; /* cream: same as the logo crops, so they blend in */
+  --surface: #ffffff;
+  --text: #0d2045; /* navy */
+  --text-muted: #55617a;
+
+  --primary: #3567c2;
+  --primary-dark: #152d6a;
+  --primary-soft: #7f9cd4;
+  --coral: #fa794b;
+  --coral-soft: #fba583;
+  --teal: #61c3af;
+  --teal-soft: #94d1c4;
+  --yellow: #f9b83e;
+  --yellow-soft: #facf82;
+  --purple: #8964c1;
+  --purple-soft: #b497d2;
+  --danger: #d64545; /* its own red: never the coral */
+  --danger-soft: #fbe3e3;
+
+  --radius-sm: 8px;
+  --radius: 12px; /* buttons AND initials avatars (rounded squares) */
+  --radius-lg: 20px; /* cards */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --font: 'Urbanist', system-ui, sans-serif;
+  --shadow: 0 2px 12px rgba(13, 32, 69, 0.08);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 17px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.15;
+  margin: 0 0 var(--space-3);
+  font-weight: 800;
+}
+
+a {
+  color: var(--primary);
+}
+
+button {
+  font: inherit;
+}
+
+/* shared button styles */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 44px; /* tap target */
+  padding: var(--space-2) var(--space-5);
+  border: 0;
+  border-radius: var(--radius);
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+}
+.btn-primary:hover {
+  background: var(--primary-dark);
+}
+.btn-secondary {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: inset 0 0 0 2px var(--primary-soft);
+}
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+.card {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: var(--space-5);
+}

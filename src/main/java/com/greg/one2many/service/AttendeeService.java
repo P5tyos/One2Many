@@ -128,11 +128,17 @@ public class AttendeeService {
     public Attendee completeProfile(String token, String sessionSecret, String name, String message) {
         Attendee attendee = requireSession(token, sessionSecret);
 
-        if (profanityService.containsProfanity(name) || profanityService.containsProfanity(message)) {
-            throw new InappropriateContentException("profile.inappropriate");
-        }
-
         synchronized (attendee) {
+            // the name is set once, by the attendee, on the first save. After that only the
+            // moderator can change it (renameByAdmin); a different name sent from the phone is ignored
+            if (attendee.getName() != null) {
+                name = attendee.getName();
+            }
+
+            if (profanityService.containsProfanity(name) || profanityService.containsProfanity(message)) {
+                throw new InappropriateContentException("profile.inappropriate");
+            }
+
             boolean unchanged = Objects.equals(name, attendee.getName())
                     && Objects.equals(message, attendee.getMessage());
 
@@ -187,8 +193,15 @@ public class AttendeeService {
                 .sorted(Comparator.comparing(Attendee::getJoinedAt))
                 .map(a -> new AdminAttendeeView(
                         a.getAdminId(), a.getName(), a.getMessage(), a.getLinkedinUrl(),
-                        a.getStatus(), a.getFlagCount(), a.getName() != null, a.getJoinedAt()))
+                        a.getStatus(), a.getFlagCount(), a.getName() != null, a.isRedeemed(), a.getJoinedAt()))
                 .collect(Collectors.toList());
+    }
+
+    // station: has the phone opened the page behind this token yet?
+    // unknown token (removed, replaced, reset) → simply "no"; no exception, it's just a status check
+    public boolean isPageOpened(String token) {
+        Attendee attendee = byToken.get(token);
+        return attendee != null && attendee.isRedeemed();
     }
 
     public AdminStats getStats() {
@@ -209,6 +222,16 @@ public class AttendeeService {
         }
         log.warn("Moderator flagged '{}' (flag {}, manual review from flag {})",
                 attendee.getName(), attendee.getFlagCount(), flagsBeforeReview);
+    }
+
+    // moderator corrects a typo in someone's name; their token and wristband stay the same
+    public void renameByAdmin(String adminId, String newName) {
+        Attendee attendee = findByAdminId(adminId);
+        synchronized (attendee) {
+            String oldName = attendee.getName();
+            attendee.setName(newName.trim());
+            log.warn("Moderator renamed '{}' to '{}'", oldName, attendee.getName());
+        }
     }
 
     public void approve(String adminId) {

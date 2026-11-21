@@ -1,14 +1,17 @@
 package com.greg.one2many.web;
 
 import com.greg.one2many.dto.AdminAttendeeView;
+import com.greg.one2many.dto.AdminRenameRequest;
 import com.greg.one2many.dto.AdminStats;
 import com.greg.one2many.dto.RescanView;
 import com.greg.one2many.service.AttendeeService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -33,6 +36,14 @@ public class AdminController {
         return ResponseEntity.noContent().build();
     }
 
+    // correct a typo in someone's name (the attendee can't change it after the first save)
+    @PostMapping("/attendees/{adminId}/name")
+    public ResponseEntity<Void> rename(@PathVariable("adminId") String adminId,
+                                       @Valid @RequestBody AdminRenameRequest request) {
+        attendeeService.renameByAdmin(adminId, request.getName());
+        return ResponseEntity.noContent().build();
+    }
+
     // works for both FLAGGED and PENDING_REVIEW: makes them visible again
     @PostMapping("/attendees/{adminId}/approve")
     public ResponseEntity<Void> approve(@PathVariable("adminId") String adminId) {
@@ -44,6 +55,12 @@ public class AdminController {
     public ResponseEntity<Void> remove(@PathVariable("adminId") String adminId) {
         attendeeService.remove(adminId);
         return ResponseEntity.noContent().build();
+    }
+
+    // station: polled while the personal QR is on screen; true once the phone opened the page
+    @GetMapping("/tokens/{token}/opened")
+    public Map<String, Boolean> pageOpened(@PathVariable("token") String token) {
+        return Map.of("opened", attendeeService.isPageOpened(token));
     }
 
     // ---------- re-scan confirmation ----------

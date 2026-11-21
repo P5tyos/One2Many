@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.greg.one2many.exception.InvalidSessionException;
@@ -30,6 +31,13 @@ public class GlobalExceptionHandler {
     private final MessageSource messageSource;
 
     // 410 Gone: "this existed, but not any more" — the old page after a re-scan
+    // an address that doesn't exist: a plain 404, not a 500, and not an error in the log
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Map<String, String>> handleNotFound(NoResourceFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", resolve("error.notFound")));
+    }
+
     @ExceptionHandler(SessionReplacedException.class)
     public ResponseEntity<Map<String, String>> handleSessionReplaced(SessionReplacedException ex) {
         return ResponseEntity.status(HttpStatus.GONE)
