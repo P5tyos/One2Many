@@ -407,7 +407,8 @@ const timeLeftText = computed(() => {
             <span>personas ya se han unido</span>
           </template>
           <template v-else>
-            <span class="counter-first">¡Sé de los primeros!</span>
+            <span class="counter-first">Date a conocer</span>
+            <span>y conecta con todos los que vengan</span>
           </template>
         </div>
         <p class="privacy">

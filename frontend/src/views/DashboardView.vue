@@ -126,17 +126,85 @@ async function saveRename(a) {
 const LINK_START = 'https://www.linkedin.com/in/'
 const manualUrl = ref(LINK_START)
 const manualMsg = ref(null) // { ok, text }
-async function sendManual() {
+async function sendManual(fromScanner) {
   manualMsg.value = null
+  const link = typeof fromScanner === 'string' ? fromScanner : manualUrl.value.trim()
   try {
-    await api('/api/admin/station/manual', { method: 'POST', body: { linkedinUrl: manualUrl.value.trim() } })
-    manualMsg.value = { ok: true, text: 'Enviado: mira la estación.' }
-    manualUrl.value = LINK_START
+    await api('/api/admin/station/manual', { method: 'POST', body: { linkedinUrl: link } })
+    manualMsg.value = {
+      ok: true,
+      text: typeof fromScanner === 'string' ? 'Escaneo recibido aquí: enviado a la estación.' : 'Enviado: mira la estación.',
+    }
+    if (typeof fromScanner !== 'string') manualUrl.value = LINK_START
   } catch (e) {
     if (e.status === 401) needsLogin.value = true
     manualMsg.value = { ok: false, text: e.fields?.linkedinUrl ?? e.message }
   }
   setTimeout(() => (manualMsg.value = null), 6000)
+}
+
+// ---- the scanner works here too ----
+// Windows sends the scanner's "typing" to whichever window was clicked last. So the dashboard
+// recognises a scan as well and hands it to the station through the manual-add mailbox
+// (the station shows the QR, lock included).
+// - Outside text boxes: fast keys + Enter, 20+ characters (same rule as the station).
+// - Inside a text box (search, event form...): the characters land in the box first, so the rule
+//   is stricter: 20+ characters at an inhuman AVERAGE speed (< 50 ms per key; the fastest humans
+//   are well above 100) + Enter. Then the box is put back as it was, the Enter is cancelled
+//   (nothing gets saved), and the link goes to the station. A LinkedIn link can never end up
+//   in the event details by accident (Greg, 21 Nov).
+const SCANNER_MAX_GAP_MS = 150
+const SCANNER_MIN_LENGTH = 20
+const SCANNER_MAX_AVG_MS = 50
+let scanBuffer = ''
+let lastKeyTime = 0
+let burstStart = 0
+let burstField = null // the text box the burst started in (null = no box)
+let burstFieldValueBefore = ''
+function activeTextField() {
+  const el = document.activeElement
+  return el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') ? el : null
+}
+function onKeyDown(e) {
+  if (e.ctrlKey || e.altKey || e.metaKey) return
+  const field = activeTextField()
+  if (e.key === ' ') {
+    scanBuffer = '' // a scanner never sends spaces: this is a human
+    return
+  }
+  const now = performance.now()
+
+  if (e.key === 'Enter') {
+    const text = scanBuffer
+    const avgGap = text.length > 1 ? (lastKeyTime - burstStart) / (text.length - 1) : Infinity
+    scanBuffer = ''
+    const isScan = text.length >= SCANNER_MIN_LENGTH && (!field || avgGap < SCANNER_MAX_AVG_MS)
+    if (isScan) {
+      e.preventDefault() // no form submit
+      e.stopPropagation()
+      if (field && field === burstField) {
+        field.value = burstFieldValueBefore // undo the scanner's typing
+        field.dispatchEvent(new Event('input', { bubbles: true })) // tell Vue (v-model)
+      }
+      sendManual(text)
+    } else if (!field) {
+      e.preventDefault()
+    }
+    return
+  }
+
+  if (e.key.length === 1) {
+    if (!field) e.preventDefault() // outside boxes: Firefox must not start Quick Find on "/"
+    const newBurst = now - lastKeyTime > SCANNER_MAX_GAP_MS || field !== burstField
+    if (newBurst) {
+      scanBuffer = ''
+      burstStart = now
+      burstField = field
+      burstFieldValueBefore = field ? field.value : '' // keydown comes before the letter lands
+    }
+    scanBuffer += e.key
+    lastKeyTime = now
+  }
 }
 
 // ---- station mirror ----
@@ -224,12 +292,14 @@ function reset() {
 let pollTimer = null
 let clockTimer = null
 onMounted(() => {
+  window.addEventListener('keydown', onKeyDown, true) // capture: before any form sees Enter
   poll()
   loadEvent()
   pollTimer = setInterval(poll, POLL_MS)
   clockTimer = setInterval(() => (now.value = Date.now()), 1000)
 })
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeyDown, true)
   clearInterval(pollTimer)
   clearInterval(clockTimer)
 })
@@ -411,7 +481,7 @@ onBeforeUnmount(() => {
 
         <form class="card manual-add" @submit.prevent="sendManual">
           <h2>Añadir a mano</h2>
-          <p class="muted small">Si el lector no puede leer su QR: pega su enlace de LinkedIn. El código personal aparece en la estación.</p>
+          <p class="muted small">Si el lector no puede leer su QR: pega su enlace de LinkedIn. El código personal aparece en la estación. (También puedes escanear con esta ventana activa.)</p>
           <input v-model="manualUrl" />
           <button class="btn btn-primary" type="submit">Enviar a la estación</button>
           <p v-if="manualMsg" class="small" :class="manualMsg.ok ? 'ok-text' : 'field-error'">{{ manualMsg.text }}</p>
