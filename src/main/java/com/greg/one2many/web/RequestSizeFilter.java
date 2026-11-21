@@ -42,13 +42,21 @@ public class RequestSizeFilter extends OncePerRequestFilter {
 
     // a request whose body stops being readable after MAX_BODY_BYTES (reading on = 400 "malformed")
     private static class LimitedRequest extends HttpServletRequestWrapper {
+        private ServletInputStream limited; // created once: one counter for the whole body
+
         LimitedRequest(HttpServletRequest request) {
             super(request);
         }
 
         @Override
         public ServletInputStream getInputStream() throws IOException {
-            ServletInputStream original = super.getInputStream();
+            if (limited == null) {
+                limited = wrap(super.getInputStream());
+            }
+            return limited;
+        }
+
+        private static ServletInputStream wrap(ServletInputStream original) {
             return new ServletInputStream() {
                 private long count = 0;
 

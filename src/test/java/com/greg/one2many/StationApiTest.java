@@ -196,10 +196,13 @@ class StationApiTest extends ApiTestSupport {
         }
 
         @Test
-        void unknownUrlWithoutLoginIs401NotA404() throws Exception {
+        void unknownUrlWithoutLoginGoesToLoginNotA404() throws Exception {
             // anyRequest().authenticated(): security answers before the 404 handler,
-            // so strangers can't probe which URLs exist
-            mvc.perform(get("/no/such/page")).andExpect(status().isUnauthorized());
+            // so strangers can't probe which URLs exist. Pages → login form, API → plain 401.
+            mvc.perform(get("/no/such/page"))
+                    .andExpect(status().isFound())
+                    .andExpect(redirectedUrl("/login"));
+            mvc.perform(get("/api/no/such/endpoint")).andExpect(status().isUnauthorized());
         }
     }
 }

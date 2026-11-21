@@ -7,6 +7,7 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 
 @Configuration
 @EnableWebSecurity
@@ -33,7 +34,13 @@ public class SecurityConfig {
             )
             // login page; afterwards always the dashboard (true = ignore remembered pages), which links to the station
             .formLogin(form -> form.defaultSuccessUrl("/dashboard", true))
-            .httpBasic(Customizer.withDefaults());  // username:password for curl testing
+            .httpBasic(Customizer.withDefaults())
+            // not logged in: pages (/station, /dashboard) → our login form; /api/** → plain 401.
+            // Decided by path, not by the Accept header: WebConfig ignores Accept (API = always
+            // JSON), and Security would otherwise fall back to the browser's grey Basic popup.
+            .exceptionHandling(e -> e.defaultAuthenticationEntryPointFor(
+                    new LoginUrlAuthenticationEntryPoint("/login"),
+                    request -> !request.getRequestURI().startsWith("/api/")));  // username:password for curl testing
         return http.build();
     }
 }
