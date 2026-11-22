@@ -40,6 +40,10 @@ How to prepare and run One2Many at an event. Written for the organiser: the pers
 
 > The personal codes are built from the address the station is open on. If the station is on `localhost`, it shows a red warning and phones cannot open the codes.
 
+> **Log in calmly.** Several wrong passwords through the tunnel also pause *your* tunnel logins for a few minutes. Keep both browsers open once you are in: a running session is never affected.
+>
+> **Emergency door:** on the laptop itself, `http://127.0.0.1:8090/dashboard` always lets you log in, even during a pause (`start-event.bat` prints it). Nobody else can use this door: the app only accepts direct connections from the laptop itself. But the station must stay on the tunnel address: "Abrir estación ↗" from a `127.0.0.1` dashboard opens the station there too (red warning, phones can't open the codes).
+
 ![The station before the first person](images/station-idle.png)
 
 ## During the event
@@ -115,6 +119,7 @@ If someone whose page is already open on a phone is scanned again (lost phone, c
 - **Estación ahora**: a live mini-copy of what the station shows (never the personal code).
 - **Liberar todas las sesiones** (Emergencia): see [Troubleshooting](#troubleshooting).
 - **Vaciar lista** (Nuevo evento): deletes all attendees. Cannot be undone.
+- **Red banner "intentos fallidos de inicio de sesión desde fuera"**: someone is guessing the admin password through the tunnel. Your session is safe. After a few wrong tries, new outside logins pause for a while, which makes guessing hopeless. The banner is red while a pause runs or the last failure was recent; after that it becomes a quiet grey line (so one typo of yours doesn't shout all event).
 
 ## Troubleshooting
 
@@ -132,6 +137,7 @@ If someone whose page is already open on a phone is scanned again (lost phone, c
 | The app window closed or the laptop restarted | **All attendees are lost** (they only live in memory) | Start again with `start-event.bat`. Everyone has to re-scan and write their profile again. |
 | The app seems frozen | QuickEdit: someone clicked in the console window | Press **Esc** in that window. Turn QuickEdit off. |
 | `start-event.bat` says port 8090 is busy | The app is already running in another window | Close the other window first, or use it. |
+| Login keeps saying the password is wrong, or the dashboard shows **"Inicios de sesión en pausa"** | Repeated wrong passwords from outside: new tunnel logins are paused for a few minutes (even the right password is refused) | Wait for the time shown, or log in on the laptop at `http://127.0.0.1:8090/dashboard`. Sessions that are already open keep working. |
 
 ## After the event
 

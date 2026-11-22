@@ -5,6 +5,8 @@
 // "wristband" cookie, so from then on only this phone can use the page.
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { api } from '@/api'
+import { hasLink } from '@/lib/links'
+import { plain, initials, tone } from '@/lib/text'
 import logoHeader from '@/assets/brand/logo-header.png'
 
 const props = defineProps({ token: { type: String, required: true } })
@@ -16,8 +18,7 @@ const SAVED_BANNER_MS = 5000
 const NAME_MAX = 60 // same limits as the backend (ProfileDetailsRequest)
 const MESSAGE_MAX = 100
 const SEARCH_FROM = 6 // show the search box once the list is this long
-// soft tones for the initials avatars (rounded squares), picked by name so each person keeps theirs
-const TONES = ['var(--coral-soft)', 'var(--teal-soft)', 'var(--yellow-soft)', 'var(--purple-soft)', 'var(--primary-soft)']
+// avatar tones, initials and accent-free search: src/lib/text.js
 
 const view = ref('loading') // loading | error | form | list
 const fatal = ref({ title: '', text: '', retry: false })
@@ -51,18 +52,7 @@ async function loadFilter() {
 // surname would otherwise lock someone out, and names can't be changed later)
 const messageBad = computed(() => !!filter.value?.check(form.value.message))
 
-// no links (same rule as the backend): their LinkedIn is already on their card.
-// The ending must be lowercase ("prácticas.Es mi sueño" is a sentence, not an address).
-// Developer words that look like addresses are fine: Node.js, Vue.js, ASP.NET, socket.io
-const LINK_START = /https?:\/\/|www\./i
-// endings that are also everyday words ("Hola.me llamo") only count before a "/"
-const LINK_ADDRESS =
-  /\b[A-Za-z0-9-]+\.((com|es|net|org|io|gal|eu|info|ly|app|link|site|online|club|shop|top|biz|xyz|tk|ru|cn|gg|cc)\b|(me|to|co|tv|gl)\/)/
-const LINK_LOOKALIKES = /asp\.net|ado\.net|vb\.net|socket\.io/gi
-function hasLink(text) {
-  const t = text ?? ''
-  return LINK_START.test(t) || LINK_ADDRESS.test(t.replace(LINK_LOOKALIKES, ' '))
-}
+// no links (same rule as the backend): their LinkedIn is already on their card (src/lib/links.js)
 const messageLink = computed(() => hasLink(form.value.message))
 const nameLink = computed(() => !me.value?.profileComplete && hasLink(form.value.name))
 const nameBad = computed(() => !!filter.value?.check(form.value.name))
@@ -97,9 +87,6 @@ function toggleExpanded(person) {
 
 // search: case- and accent-insensitive ("lucia" finds "Lucía"), by name or intro
 const query = ref('')
-function plain(text) {
-  return (text ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-}
 const shown = computed(() => {
   const q = plain(query.value.trim())
   if (!q) return people.value
@@ -108,21 +95,7 @@ const shown = computed(() => {
 const toVisit = computed(() => shown.value.filter((p) => !visited.value.has(p.linkedinUrl)))
 const alreadyVisited = computed(() => shown.value.filter((p) => visited.value.has(p.linkedinUrl)))
 
-// ---- small helpers for the cards ----
-function initials(name) {
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((word) => [...word][0]) // [...word] so an accented first letter stays whole
-    .join('')
-    .toUpperCase()
-}
-function tone(name) {
-  let hash = 0
-  for (const ch of name) hash = (hash * 31 + ch.codePointAt(0)) >>> 0
-  return TONES[hash % TONES.length]
-}
+// ---- small helpers for the cards: initials() and tone() come from src/lib/text.js ----
 
 // ---- errors that end the page (wrong link, other phone, replaced session...) ----
 // The backend's message is already translated to the phone's language: we show it as is.

@@ -42,9 +42,11 @@ echo  1. En la ventana del tunel aparece una direccion https://....trycloudflare
 echo  2. Abre ESA direccion (no localhost) en los dos navegadores:
 echo     - estacion:  .../station   (los QR personales usan esa direccion)
 echo     - panel:     .../dashboard
+echo  Emergencia (solo en este portatil): http://127.0.0.1:8090/dashboard
+echo     siempre deja iniciar sesion, pero la ESTACION debe seguir en la direccion del tunel.
 echo  Para parar: Ctrl+C aqui y en la ventana del tunel.
 echo.
 
-start "One2Many - tunel" cmd /k cloudflared tunnel --url http://localhost:8090
+start "One2Many - tunel" cmd /k cloudflared tunnel --url http://127.0.0.1:8090
 java -jar "%JAR%" --spring.profiles.active=event
 pause

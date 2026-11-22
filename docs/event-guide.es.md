@@ -40,6 +40,10 @@ Cómo preparar y usar One2Many en un evento. Escrita para la persona organizador
 
 > Los códigos personales se crean con la dirección en la que está abierta la estación. Si la estación está en `localhost`, muestra un aviso rojo y los móviles no pueden abrir los códigos.
 
+> **Inicia sesión con calma.** Varias contraseñas incorrectas a través del túnel también pausan *tus* inicios de sesión por el túnel durante unos minutos. Deja los dos navegadores abiertos cuando hayas entrado: una sesión abierta nunca se ve afectada.
+>
+> **Puerta de emergencia:** en el propio portátil, `http://127.0.0.1:8090/dashboard` siempre te deja entrar, incluso durante una pausa (`start-event.bat` la muestra). Nadie más puede usar esta puerta: la aplicación solo acepta conexiones directas desde el propio portátil. Pero la estación debe seguir en la dirección del túnel: «Abrir estación ↗» desde un panel en `127.0.0.1` abre la estación también ahí (aviso rojo, los móviles no pueden abrir los códigos).
+
 ![La estación antes de la primera persona](images/station-idle.png)
 
 ## Durante el evento
@@ -115,6 +119,7 @@ Si se vuelve a escanear a alguien cuya página ya está abierta en un móvil (pe
 - **Estación ahora**: una mini copia en directo de lo que muestra la estación (nunca el código personal).
 - **Liberar todas las sesiones** (Emergencia): mira [Problemas y soluciones](#problemas-y-soluciones).
 - **Vaciar lista** (Nuevo evento): borra a todos los asistentes. No se puede deshacer.
+- **Banner rojo «intentos fallidos de inicio de sesión desde fuera»**: alguien está intentando adivinar la contraseña de administrador a través del túnel. Tu sesión está a salvo. Tras unos pocos intentos fallidos, los nuevos inicios de sesión desde fuera se pausan un rato, así que adivinarla es imposible en la práctica. El banner es rojo mientras dura una pausa o si el último fallo fue reciente; después pasa a ser una línea gris discreta (así un despiste tuyo no grita todo el evento).
 
 ## Problemas y soluciones
 
@@ -132,6 +137,7 @@ Si se vuelve a escanear a alguien cuya página ya está abierta en un móvil (pe
 | La ventana de la aplicación se cerró o el portátil se reinició | **Se pierden todos los asistentes** (solo existen en memoria) | Vuelve a arrancar con `start-event.bat`. Todos tienen que volver a escanear y escribir su perfil. |
 | La aplicación parece congelada | Edición rápida: alguien hizo clic en la ventana de consola | Pulsa **Esc** en esa ventana. Desactiva la edición rápida. |
 | `start-event.bat` dice que el puerto 8090 está ocupado | La aplicación ya está abierta en otra ventana | Cierra primero la otra ventana, o usa esa. |
+| **Inicio de sesión en pausa**: siempre dice que la contraseña es incorrecta, o el panel muestra «Inicios de sesión en pausa» | Varias contraseñas incorrectas desde fuera: los nuevos inicios de sesión por el túnel se pausan unos minutos (incluso con la contraseña correcta) | Espera la hora indicada, o inicia sesión en el portátil en `http://127.0.0.1:8090/dashboard`. Las sesiones ya abiertas siguen funcionando. |
 
 ## Después del evento
 

@@ -168,7 +168,10 @@ Spring looks in `frontend/dist` on disk **before** the copy inside the jar. When
 Every screen asks the server for news every few seconds. With about 50 people that is a tiny load, it survives unreliable Wi-Fi, and it works through the quick tunnel without extra setup. Timeouts (re-scans, the station window) are checked when something looks at them, so there are no background timers.
 
 ### Behind the tunnel
-The `event` profile (`application-event.properties`) turns on Secure cookies, trusts cloudflared's "the visitor uses HTTPS" header (`server.forward-headers-strategy=native`) and keeps redirects relative, so login never bounces to plain HTTP.
+The `event` profile (`application-event.properties`) turns on Secure cookies, trusts cloudflared's "the visitor uses HTTPS" header (`server.forward-headers-strategy=native`) and keeps redirects relative, so login never bounces to plain HTTP. It also makes the app **listen only on `127.0.0.1`**: only programs on the laptop itself can connect (cloudflared, and the organiser's emergency door `http://127.0.0.1:8090`). Nobody on the same Wi-Fi, hotspot or any other network can reach the app directly, so everyone goes through the tunnel and its protections; forwarding headers are believed only from loopback. This holds wherever the event takes place, not only on a private network.
+
+### A login pause instead of per-IP limits
+Repeated wrong passwords from outside pause **all** new outside logins for a few minutes. Global rather than per IP: at school everyone shares one public IP anyway, and a global pause can't be dodged by switching networks. With a long random password guessing can't succeed in practice; the pause makes it hopeless and, more importantly, tells the organiser on the dashboard that someone is trying. The obvious risk of a global pause, locking out the organiser, is handled in two ways: sessions that are already logged in are never affected, and logins made on the laptop itself are exempt.
 
 ## Security model
 
@@ -183,7 +186,7 @@ The `event` profile (`application-event.properties`) turns on Secure cookies, tr
 | Cross-site requests (CSRF)                                 | Spring's CSRF tokens are off; the cookies are SameSite (staff `Strict`, wristband `Lax`). `trycloudflare.com` is on the browser [public suffix list](https://publicsuffix.org/), so another person's tunnel counts as a different site. |
 | Flooding with huge requests                                | Request bodies over 8 KB are refused before they are read (413)                                                                                                                                                                         |
 | Filling the log with odd requests                          | Client mistakes (405, 406, 415, unknown tokens…) are answered without writing to the log; the log is capped at 200 MB                                                                                                                   |
-| Guessing the admin password                                | Must be typed at startup (never stored), at least 12 characters                                                                                                                                                                         |
+| Guessing the admin password                                | Must be typed at startup (never stored), at least 12 characters. Repeated wrong passwords pause new logins for a while, and the organiser sees a warning on the dashboard. |
 
 The admin password lives only in an environment variable of the start-up window. It is never in the code, the config files or the log.
 
@@ -193,6 +196,8 @@ Being honest about them is part of the design:
 
 - **One process, in memory.** If the app stops or the laptop restarts, all attendees are lost.
 - **The quick tunnel address changes when the tunnel restarts.** Every phone page then stops working. The dashboard's "Release all sessions" makes everyone's next scan issue a new code without confirmations, keeping their profile.
-- **Identity is only the LinkedIn QR.** Someone who arrives first with a screenshot of another person's QR can claim their name. The organiser can rename or remove them.
-- **No rate limiting.** A strong admin password matters, because the login page is reachable from the internet.
-- **The filters can be fooled** (spaced-out links, creative spelling). Manual moderation is the last line.
+- **Identity rests on the LinkedIn QR.** There are no accounts, so the organiser keeps the last word: they can rename or remove anyone.
+- **The login pause can also delay the organiser's own new logins.** Sessions that are already open keep working, and the laptop itself always has a way in.
+- **Automatic filters are never perfect.** Manual moderation on the dashboard is the last line.
+
+Found a weakness? Please report it privately: see [SECURITY.md](../SECURITY.md).

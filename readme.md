@@ -23,6 +23,7 @@ The organiser follows everything on a dashboard: who has joined, moderation, re-
 - **Personal page on the phone**, protected by a "wristband" cookie: a photo of someone's code is useless once they have opened it.
 - **Moderation**: automatic language filter (English, Spanish, Portuguese word lists), links blocked, flag / approve / rename / remove on the dashboard, and a hint for swear words hidden inside other words.
 - **Re-scan with confirmation**: someone who lost their page can scan again, and the organiser confirms it is really them.
+- **Login protection**: repeated wrong admin passwords from outside pause new logins for a few minutes, with a warning on the dashboard.
 - **Privacy first**: no database. Everything lives in memory during the event; only a short moderation log is kept, for 7 days.
 - **Runs on one laptop**: one `.jar` file plus a free Cloudflare tunnel for HTTPS. No server or hosting needed.
 - **Interface in Spanish**; error messages in English, Spanish and Galician.
@@ -50,10 +51,11 @@ Running it at a real event (HTTPS tunnel, event settings, a fixed password) is e
 | [Architecture](docs/architecture.md) | How it works inside, and why it was built this way |
 | [API reference](docs/api.md) | Every endpoint and status code |
 | [Development](docs/development.md) | Running it in development mode, tests, conventions |
+| [Security](SECURITY.md) | How to report a weakness privately |
 
 ## Built with
 
-Java 21 · Spring Boot 4 · Spring Security · Vue 3 · Vite · Gradle. 219 automated tests (JUnit 5 + MockMvc).
+Java 21 · Spring Boot 4 · Spring Security · Vue 3 · Vite · Gradle. 341 automated tests: 250 for the backend (JUnit 5 + MockMvc) and 91 for the frontend logic (Vitest).
 
 ## Credits
 

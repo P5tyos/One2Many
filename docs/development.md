@@ -55,11 +55,15 @@ It asks for the admin password and creates 10 attendees covering every dashboard
 
 ## Tests
 
+There are two test suites: the backend (Java) and the frontend logic (JavaScript).
+
+### Backend
+
 ```bash
 gradlew.bat test
 ```
 
-About 2 minutes, 219 tests (JUnit 5 + MockMvc), in `src/test/java/com/greg/one2many`. They start the whole app in memory with the `test` profile (`src/test/resources/application-test.properties`: admin password `test`, a fixed host card, logs in `build/test-logs`).
+About 2 minutes, 250 tests (JUnit 5 + MockMvc), in `src/test/java/com/greg/one2many`. They start the whole app in memory with the `test` profile (`src/test/resources/application-test.properties`: admin password `test`, a fixed host card, logs in `build/test-logs`).
 
 | Test class | Covers |
 |---|---|
@@ -72,10 +76,30 @@ About 2 minutes, 219 tests (JUnit 5 + MockMvc), in `src/test/java/com/greg/one2m
 | `ManualAddAndStatsTest` | Manual-add mailbox, `totalJoined` |
 | `HiddenSinceAndStationStateTest` | `hiddenSince`, the station mirror |
 | `ReviewFixesTest` | Hardening: request size, quiet errors, log cap, text cleaning, release sessions, links |
+| `LoginThrottleTest`, `LoginThrottleTimingTest` | The login pause: counting, the pause and its end, the localhost exception, fake headers, `lastLoginFailureAt` |
+| `EventProfileSettingsTest` | Guards the event settings (listen only on 127.0.0.1, trust only loopback proxies) and the tunnel line in `start-event.bat` |
 
-`ApiTestSupport` holds the shared helpers. Its `Phone` class plays an attendee's phone: it keeps the token and the wristband cookie like a real browser.
+`ApiTestSupport` holds the shared helpers. Its `Phone` class plays an attendee's phone: it keeps the token and the wristband cookie like a real browser. MockMvc requests count as "local" (127.0.0.1, no proxy headers); the login-pause tests simulate tunnel requests with a visitor address plus a `CF-Connecting-IP` header.
 
 > Stop the app in VS Code before running the tests: a running app can lock `build/`, and the run fails with "Failed to clean up stale outputs".
+
+### Frontend
+
+```bash
+cd frontend
+npm test
+```
+
+Under a second, 91 tests (Vitest), in `frontend/tests/unit`. They test the plain logic in `frontend/src/lib/`, which the screens import:
+
+| Module | Covers |
+|---|---|
+| `scanner.js` | Scanner detection on the station and on the dashboard (inside and outside text boxes) |
+| `station.js` | The station lock |
+| `links.js` | The phone form's link check (same examples as the backend tests, so both rules stay identical) |
+| `text.js` | Initials, avatar tone, accent-insensitive search, "Oculto" minutes, the red/grey login banner rule |
+
+Logic that should be tested goes into `src/lib/` as plain functions without screen code; the `.vue` files only act on the results.
 
 ## Building the event jar
 
@@ -94,8 +118,9 @@ src/main/resources/
   application-event.properties     extra settings for the event (start-event.bat)
   messages*.properties             error messages: English, Spanish, Galician
   profanity/{en,es,pt}.txt         word lists
-src/test/                          tests and the test profile
-frontend/src/                      Vue app: views/, api.js, router/, assets/
+src/test/                          backend tests and the test profile
+frontend/src/                      Vue app: views/, lib/ (testable logic), api.js, router/, assets/
+frontend/tests/unit/               frontend tests (Vitest)
 scripts/demo-data.ps1              fake attendees for local testing
 start-event.bat                    event-day launcher (app + tunnel)
 docs/                              this documentation
@@ -118,6 +143,7 @@ docs/                              this documentation
 | Event details, host card | `application.properties` (`one2many.event.*`, `one2many.host.*`) |
 | Flags before an approval is needed (3) | `one2many.moderation.flags-before-review` |
 | Time to answer a re-scan (120 s) | `one2many.moderation.rescan-timeout-seconds` |
+| Login pause (5 failures in 15 min → 5 min pause) | `one2many.security.login.max-failures`, `window-minutes`, `pause-minutes` (minutes may be decimals) |
 | Blocked words | `src/main/resources/profanity/*.txt` (one word or phrase per line) |
 | Name / sentence length (60 / 100) | `dto/ProfileDetailsRequest` and `NAME_MAX` / `MESSAGE_MAX` in `PersonalView.vue` |
 | Reveals and reveal window (3, 3 min) | `MAX_REVEALS`, `REVEAL_WINDOW_MS` in `StationView.vue` |

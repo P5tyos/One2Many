@@ -3,6 +3,8 @@
 // and the event details (editable at any time; the station and phones pick them up).
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { api } from '@/api'
+import { createDashboardScanner } from '@/lib/scanner'
+import { plain, hiddenFor as hiddenForAt, loginAlarm as loginAlarmAt } from '@/lib/text'
 import logoHeader from '@/assets/brand/logo-header.png'
 
 const POLL_MS = 2500 // fresh data this often (re-scans need a quick answer)
@@ -49,10 +51,7 @@ async function act(path, method = 'POST', body) {
 
 // ---- the table ----
 const query = ref('')
-function plain(text) {
-  return (text ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
-}
-// newest first; search by name, sentence or link
+// newest first; search by name, sentence or link (plain(): src/lib/text.js)
 const rows = computed(() => {
   const q = plain(query.value.trim())
   const list = [...attendees.value].reverse()
@@ -153,59 +152,25 @@ async function sendManual(fromScanner) {
 //   are well above 100) + Enter. Then the box is put back as it was, the Enter is cancelled
 //   (nothing gets saved), and the link goes to the station. A LinkedIn link can never end up
 //   in the event details by accident (Greg, 21 Nov).
-const SCANNER_MAX_GAP_MS = 150
-const SCANNER_MIN_LENGTH = 20
-const SCANNER_MAX_AVG_MS = 50
-let scanBuffer = ''
-let lastKeyTime = 0
-let burstStart = 0
-let burstField = null // the text box the burst started in (null = no box)
-let burstFieldValueBefore = ''
+// The detection rules live in src/lib/scanner.js; here we only act on its decision.
+const dashboardScanner = createDashboardScanner()
 function activeTextField() {
   const el = document.activeElement
   return el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') ? el : null
 }
 function onKeyDown(e) {
-  if (e.ctrlKey || e.altKey || e.metaKey) return
-  const field = activeTextField()
-  if (e.key === ' ') {
-    scanBuffer = '' // a scanner never sends spaces: this is a human
-    return
+  const result = dashboardScanner.keyDown(e, performance.now(), activeTextField())
+  if (result.preventDefault) e.preventDefault() // no form submit; outside boxes no Firefox Quick Find
+  if (result.stopPropagation) e.stopPropagation()
+  if (result.restore) {
+    result.restore.field.value = result.restore.value // undo the scanner's typing
+    result.restore.field.dispatchEvent(new Event('input', { bubbles: true })) // tell Vue (v-model)
   }
-  const now = performance.now()
-
-  if (e.key === 'Enter') {
-    const text = scanBuffer
-    const avgGap = text.length > 1 ? (lastKeyTime - burstStart) / (text.length - 1) : Infinity
-    scanBuffer = ''
-    const isScan = text.length >= SCANNER_MIN_LENGTH && (!field || avgGap < SCANNER_MAX_AVG_MS)
-    if (isScan) {
-      e.preventDefault() // no form submit
-      e.stopPropagation()
-      if (field && field === burstField) {
-        field.value = burstFieldValueBefore // undo the scanner's typing
-        field.dispatchEvent(new Event('input', { bubbles: true })) // tell Vue (v-model)
-      }
-      sendManual(text)
-    } else if (!field) {
-      e.preventDefault()
-    }
-    return
-  }
-
-  if (e.key.length === 1) {
-    if (!field) e.preventDefault() // outside boxes: Firefox must not start Quick Find on "/"
-    const newBurst = now - lastKeyTime > SCANNER_MAX_GAP_MS || field !== burstField
-    if (newBurst) {
-      scanBuffer = ''
-      burstStart = now
-      burstField = field
-      burstFieldValueBefore = field ? field.value : '' // keydown comes before the letter lands
-    }
-    scanBuffer += e.key
-    lastKeyTime = now
-  }
+  if (result.scan) sendManual(result.scan)
 }
+
+// ---- login warning: loud only while it matters (rule in src/lib/text.js) ----
+const loginAlarm = computed(() => loginAlarmAt(stats.value, now.value))
 
 // ---- station mirror ----
 const STATION_OFFLINE_MS = 12000 // no heartbeat for this long = station closed or logged out
@@ -218,11 +183,9 @@ const stationCountdown = computed(() => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 })
 
-// "hidden for 4 min"
+// "hidden for 4 min" (src/lib/text.js)
 function hiddenFor(iso) {
-  if (!iso) return '–'
-  const min = Math.floor((now.value - new Date(iso).getTime()) / 60000)
-  return min < 1 ? '<1 min' : `${min} min`
+  return hiddenForAt(iso, now.value)
 }
 
 // ---- re-scan confirmation (popup) ----
@@ -342,6 +305,18 @@ onBeforeUnmount(() => {
       {{ stats.pendingReview }}
       {{ stats.pendingReview === 1 ? 'persona ha cambiado su texto' : 'personas han cambiado su texto' }}
       tras varias marcas y espera tu aprobación (filas azules).
+    </div>
+    <!-- someone outside is guessing the admin password (only Greg sees this; never on the station) -->
+    <!-- red while a pause runs or the last failure was recent; afterwards a quiet grey line -->
+    <div v-if="stats.loginFailures" class="notice" :class="loginAlarm ? 'error' : 'quiet'">
+      🔒 {{ stats.loginFailures }}
+      {{ stats.loginFailures === 1 ? 'intento fallido' : 'intentos fallidos' }} de inicio de sesión desde fuera
+      <template v-if="stats.lastLoginFailureAt">(el último a las {{ time(stats.lastLoginFailureAt) }})</template>.
+      <template v-if="stats.loginPausedUntil">
+        <strong>Inicios de sesión en pausa hasta {{ time(stats.loginPausedUntil) }}</strong>
+        (tu sesión sigue abierta).
+      </template>
+      <span v-else>Tu sesión no se ve afectada.</span>
     </div>
     <div v-if="actionError" class="notice error">{{ actionError }}</div>
 
@@ -650,6 +625,12 @@ onBeforeUnmount(() => {
 .notice.pending {
   background: #edf3fd;
   border: 1px solid #cddcf5;
+}
+.notice.quiet {
+  background: #f1f2f5;
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 0.9rem;
 }
 .notice.error {
   background: var(--danger-soft);

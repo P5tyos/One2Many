@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "vitest run",
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
@@ -19,7 +20,8 @@
     "@vitejs/plugin-vue": "^6.0.8",
     "prettier": "3.9.6",
     "vite": "^8.2.2",
-    "vite-plugin-vue-devtools": "^8.2.1"
+    "vite-plugin-vue-devtools": "^8.2.1",
+    "vitest": "^5.1.1"
   },
   "engines": {
     "node": "^22.18.0 || >=24.12.0"

@@ -1,21 +1,30 @@
 package com.greg.one2many.web;
 
+import com.greg.one2many.security.LoginThrottleFilter;
+import com.greg.one2many.security.LoginThrottleService;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AuthenticationEventPublisher;
+import org.springframework.security.authentication.DefaultAuthenticationEventPublisher;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, LoginThrottleService loginThrottle)
+            throws Exception {
         http
+            // login pause after repeated failed passwords from outside (checked before the password)
+            .addFilterBefore(new LoginThrottleFilter(loginThrottle), UsernamePasswordAuthenticationFilter.class)
             // CSRF protection comes from our SameSite cookies instead (see notes)
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
@@ -42,5 +51,12 @@ public class SecurityConfig {
                     new LoginUrlAuthenticationEntryPoint("/login"),
                     request -> !request.getRequestURI().startsWith("/api/")));  // username:password for curl testing
         return http.build();
+    }
+
+    // makes sure every login result (form AND HTTP Basic) is published as an event,
+    // which LoginAttemptListener counts for the login pause
+    @Bean
+    public AuthenticationEventPublisher authenticationEventPublisher(ApplicationEventPublisher publisher) {
+        return new DefaultAuthenticationEventPublisher(publisher);
     }
 }

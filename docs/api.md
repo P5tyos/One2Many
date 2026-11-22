@@ -18,6 +18,17 @@ When not logged in, pages (`/station`, `/dashboard`) redirect to `/login`, and A
 
 The password comes from the `SPRING_SECURITY_USER_PASSWORD` environment variable (`start-event.bat` asks for it). Without it, Spring prints a random password at startup.
 
+### Login pause (password guessing)
+
+Failed logins from **outside** (through the tunnel) are counted, for the form and for HTTP Basic alike. After repeated failures, all new outside logins are **paused for a few minutes** (limits configurable):
+
+- During the pause the password is not checked at all, so even the right one is refused and the answer reveals nothing: the form goes back to `/login?error`; HTTP Basic gets **429** with a `Retry-After` header (seconds), an empty body and no `WWW-Authenticate`.
+- Attempts during the pause don't count and don't extend it. When it ends, counting starts again at 0. A successful login resets the counter.
+- Requests that are **already logged in** (session cookie) are never checked or blocked, so the station and the dashboard keep working.
+- **Logins made on the laptop itself are exempt**, so the organiser always has a way in. With the `event` profile the app only accepts direct connections from the laptop itself; everyone else comes through the tunnel.
+
+Settings: `one2many.security.login.max-failures`, `window-minutes`, `pause-minutes`. State lives in memory only.
+
 ## Errors
 
 Every error is JSON, translated from the `Accept-Language` header (English by default, Spanish `es`, Galician `gl`):
@@ -181,10 +192,11 @@ Everyone, including hidden and unfinished profiles, oldest first.
 ### `GET /api/admin/stats`
 
 ```json
-{ "joined": 42, "completed": 39, "flagged": 1, "pendingReview": 0, "pendingRescans": 0, "totalJoined": 44 }
+{ "joined": 42, "completed": 39, "flagged": 1, "pendingReview": 0, "pendingRescans": 0, "totalJoined": 44,
+  "loginFailures": 0, "loginPausedUntil": null, "lastLoginFailureAt": null }
 ```
 
-`joined` = people in the list now; `totalJoined` = everyone who joined, including people removed since (reset by `/api/admin/reset`).
+`joined` = people in the list now; `totalJoined` = everyone who joined, including people removed since (reset by `/api/admin/reset`). `loginFailures` = failed logins from outside since the app started; `loginPausedUntil` = end of a running [login pause](#login-pause-password-guessing), or `null`; `lastLoginFailureAt` = time of the last failed outside login (the dashboard banner is red only while a pause runs or this is under 15 minutes old).
 
 ### Moderation actions
 
@@ -251,4 +263,5 @@ Changes live in memory: a restart brings back `application.properties`.
 | 410 | Token replaced by a re-scan or by "release all sessions" |
 | 413 | Request body over 8 KB. Empty body |
 | 422 | Inappropriate language, links, a name that is empty after cleaning, or unchanged text while flagged |
+| 429 | Login paused after repeated wrong passwords from outside (HTTP Basic). `Retry-After` header, empty body |
 | 500 | Unexpected error. Generic message only; details go to the server log |

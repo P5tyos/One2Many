@@ -241,7 +241,8 @@ public class AttendeeService {
                 countWhere(a -> a.getStatus() == AttendeeStatus.FLAGGED),
                 countWhere(a -> a.getStatus() == AttendeeStatus.PENDING_REVIEW),
                 listWaitingRescans().size(),
-                totalJoined.get());
+                totalJoined.get(),
+                0, null, null); // login fields: filled in by AdminController (security, not attendees)
     }
 
     public void flag(String adminId) {

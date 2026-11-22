@@ -6,6 +6,7 @@ import com.greg.one2many.dto.AdminStats;
 import com.greg.one2many.dto.EventInfo;
 import com.greg.one2many.dto.EventUpdateRequest;
 import com.greg.one2many.dto.RescanView;
+import com.greg.one2many.security.LoginThrottleService;
 import com.greg.one2many.service.AttendeeService;
 import com.greg.one2many.service.EventService;
 import jakarta.validation.Valid;
@@ -23,6 +24,7 @@ public class AdminController {
 
     private final AttendeeService attendeeService;
     private final EventService eventService;
+    private final LoginThrottleService loginThrottle;
 
     @GetMapping("/attendees")
     public List<AdminAttendeeView> listAll() {
@@ -31,7 +33,11 @@ public class AdminController {
 
     @GetMapping("/stats")
     public AdminStats stats() {
-        return attendeeService.getStats();
+        AdminStats stats = attendeeService.getStats();
+        stats.setLoginFailures(loginThrottle.getTotalFailures());
+        stats.setLoginPausedUntil(loginThrottle.getPausedUntil());
+        stats.setLastLoginFailureAt(loginThrottle.getLastFailureAt());
+        return stats;
     }
 
     @PostMapping("/attendees/{adminId}/flag")

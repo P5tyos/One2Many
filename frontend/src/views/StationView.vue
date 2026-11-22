@@ -14,6 +14,8 @@
 import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import QRCode from 'qrcode'
 import { api } from '@/api'
+import { createStationScanner } from '@/lib/scanner'
+import { canAcceptScan as canAcceptScanIn } from '@/lib/station'
 import logoHeader from '@/assets/brand/logo-header.png'
 import logoQr from '@/assets/brand/logo-symbol-qr.png'
 import bgBlobs from '@/assets/brand/bg-blobs.png'
@@ -25,8 +27,7 @@ const MESSAGE_MS = 4000 // how long info/error messages stay up
 const HEARTBEAT_MS = 4000 // mirror: tell the dashboard "still here" this often
 const MANUAL_POLL_MS = 1500 // dashboard's manual add: how often the station checks for a link
 const OPENED_POLL_MS = 1500 // how often the station asks "has their phone opened it?"
-const SCANNER_MAX_GAP_MS = 150 // scanner keys come fast (Shift+key for : / ? adds delay); humans are slower
-const SCANNER_MIN_LENGTH = 20 // a LinkedIn link is always longer than this
+// scanner timing: see src/lib/scanner.js
 const RESCAN_POLL_MS = 1500
 const STATS_POLL_MS = 5000
 const COUNTER_FROM = 10 // show "X people joined" only above this
@@ -102,10 +103,7 @@ function forgetPerson() {
 
 // ---- the lock: can a new person be scanned right now? ----
 function canAcceptScan() {
-  // Locked while someone's code is pending. It frees itself when their phone opens the page
-  // (auto), when the 3 reveals are used up, when the 3 minutes run out, or with "Cancelar".
-  // (The old rule "free after the first reveal" was from before we could detect the opening.)
-  return state.value === 'idle' || state.value === 'message'
+  return canAcceptScanIn(state.value) // the rule lives in src/lib/station.js
 }
 
 // ---- scanning ----
@@ -224,38 +222,21 @@ function stopReveal() {
 // ---- keyboard: scanner vs human, and the SPACE key ----
 // The scanner behaves like a super-fast keyboard: it "types" the link and presses Enter.
 // We collect characters; if they arrived fast (scanner) and Enter follows, it's a scan.
-let buffer = ''
-let lastKeyTime = 0
+// The detection rules live in src/lib/scanner.js; here we only act on its decision.
+const stationScanner = createStationScanner()
 
 function onKeyDown(e) {
   if (manualOpen.value) return // Greg is typing in the manual box: scanner input ignored
 
-  if (e.code === 'Space') {
-    e.preventDefault() // don't scroll the page
-    if (!e.repeat) startReveal()
-    return
-  }
+  const result = stationScanner.keyDown(e, performance.now())
+  if (result.preventDefault) e.preventDefault() // the station owns the keyboard (and Space must not scroll)
 
-  const now = performance.now()
-  if (e.ctrlKey || e.altKey || e.metaKey) return // shortcuts (Ctrl+R, F5...) still work
-  if (e.key === 'Enter' || e.key.length === 1) e.preventDefault() // the station owns the keyboard
-
-  if (e.key === 'Enter') {
-    const text = buffer
-    buffer = ''
-    if (text.length >= SCANNER_MIN_LENGTH) submitScan(text)
-    else if (text.length >= 5) {
-      // part of a scan arrived too slowly and got cut: say so instead of doing nothing
-      console.debug('[station] scan too short, ignored:', text)
-      noteForStaff('Lectura incompleta, vuelve a escanear', `Leído: ${text}`)
-    }
-    return
-  }
-  if (e.key.length === 1) {
-    // a slow key = a human pressing keys, or the start of a new scan: start over
-    if (now - lastKeyTime > SCANNER_MAX_GAP_MS) buffer = ''
-    buffer += e.key
-    lastKeyTime = now
+  if (result.action === 'reveal') startReveal()
+  else if (result.action === 'scan') submitScan(result.text)
+  else if (result.action === 'partial') {
+    // part of a scan arrived too slowly and got cut: say so instead of doing nothing
+    console.debug('[station] scan too short, ignored:', result.text)
+    noteForStaff('Lectura incompleta, vuelve a escanear', `Leído: ${result.text}`)
   }
 }
 
