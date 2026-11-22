@@ -38,7 +38,7 @@ function back() {
       <h2>Qué es</h2>
       <p>
         En un evento quieres estar presente: escuchar las charlas, tomar un café y hablar con la gente,
-        no pasarte el rato con el móvil buscando a estas personas en LinkedIn. Pero tampoco quieres irte
+        no pasarte el rato con el móvil buscando a estas personas en LinkedIn®. Pero tampoco quieres irte
         sin conectar, o al menos sin que los demás puedan encontrarte.
       </p>
       <p>
@@ -80,6 +80,10 @@ function back() {
         <a :href="CREATOR_LINKEDIN" target="_blank" rel="noopener" class="btn btn-primary">LinkedIn ↗</a>
         <a :href="GITHUB_REPO" target="_blank" rel="noopener" class="btn btn-secondary">GitHub ↗</a>
       </div>
+      <p class="muted small disclaimer">
+        One2Many es un proyecto independiente, sin relación con LinkedIn Corporation ni respaldado por
+        ella. LinkedIn® es una marca registrada de LinkedIn Corporation.
+      </p>
     </section>
 
     <button class="btn btn-secondary back" @click="back">← Volver</button>
@@ -183,6 +187,11 @@ p:last-child {
   flex-wrap: wrap;
   gap: var(--space-3);
   margin: var(--space-3) 0;
+}
+.disclaimer {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid #eef1f7;
 }
 .back {
   justify-self: center;

@@ -1,0 +1,11 @@
+One2Many
+Copyright 2026 Greg Horvath
+
+This product includes software developed by Greg Horvath
+(https://github.com/P5tyos/one2many).
+
+The word lists in src/main/resources/profanity/ are based on the
+"List of Dirty, Naughty, Obscene, and Otherwise Bad Words"
+(https://github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words),
+licensed under the Creative Commons Attribution 4.0 International License
+(CC BY 4.0). The Spanish list was modified: entries were added and removed.

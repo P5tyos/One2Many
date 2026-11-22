@@ -383,7 +383,7 @@ const timeLeftText = computed(() => {
           <li>
             <span class="num">1</span>
             <div>
-              <strong>Abre tu QR de LinkedIn</strong>
+              <strong>Abre tu QR de LinkedIn®</strong>
               <small>App de LinkedIn → icono QR en la barra de búsqueda → «Mi código»</small>
             </div>
           </li>
@@ -415,6 +415,7 @@ const timeLeftText = computed(() => {
           Sin cuentas. Nada se guarda después del evento, salvo un registro de moderación durante 7
           días.
         </p>
+        <p class="privacy">Proyecto independiente, sin relación con LinkedIn Corporation.</p>
       </aside>
     </section>
 
