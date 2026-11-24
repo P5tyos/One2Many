@@ -23,7 +23,7 @@ Cómo preparar y usar One2Many en un evento. Escrita para la persona organizador
 
 1. **Pon los datos del evento y la tarjeta del anfitrión.** En `src/main/resources/application.properties`:
    - `one2many.event.*`: nombre, fecha, lugar, organizadores y descripción. También se pueden cambiar después desde el panel.
-   - `one2many.host.*`: el nombre del organizador, su enlace de LinkedIn y una frase. Esta tarjeta aparece fija arriba en la lista de cada asistente.
+   - `one2many.host.*`: un nombre, un enlace de LinkedIn y una frase. Puede ser una persona (`/in/…`) o una página de LinkedIn (`/company/…`); por defecto es la página de One2Many. Esta tarjeta aparece fija arriba en la lista de cada asistente.
 2. **Construye la aplicación.** En un terminal, en la carpeta del proyecto: `gradlew.bat bootJar`. Se crea `build\libs\one2many.jar`, con el frontend dentro.
 3. **Haz una prueba completa** con `start-event.bat`, un segundo monitor y un móvil de verdad. Escanéate, abre tu página en el móvil y luego pulsa Ctrl+C en las dos ventanas.
 4. **Evita que el portátil se suspenda.** La suspensión corta el túnel. En un terminal: `powercfg /change standby-timeout-ac 0`. En las opciones de energía de Windows, pon «Al cerrar la tapa» (enchufado) en **No hacer nada**.

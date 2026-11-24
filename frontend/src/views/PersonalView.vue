@@ -371,7 +371,7 @@ onBeforeUnmount(() => {
               >
                 <span class="avatar" :style="{ background: tone(p.name) }">{{ initials(p.name) }}</span>
                 <strong class="person-name">
-                  {{ p.name }} <span v-if="p.host" class="badge">Anfitrión</span>
+                  {{ p.name }} <span v-if="p.host" class="badge">Destacado</span>
                 </strong>
                 <span class="go" aria-hidden="true">↗</span>
               </a>
@@ -405,7 +405,7 @@ onBeforeUnmount(() => {
               >
                 <span class="avatar" :style="{ background: tone(p.name) }">{{ initials(p.name) }}</span>
                 <strong class="person-name">
-                  {{ p.name }} <span v-if="p.host" class="badge">Anfitrión</span>
+                  {{ p.name }} <span v-if="p.host" class="badge">Destacado</span>
                 </strong>
                 <span class="tag-visited">✓ Visitado</span>
               </a>

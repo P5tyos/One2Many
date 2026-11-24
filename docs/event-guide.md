@@ -23,7 +23,7 @@ How to prepare and run One2Many at an event. Written for the organiser: the pers
 
 1. **Set the event details and the host card.** In `src/main/resources/application.properties`:
    - `one2many.event.*`: name, date, place, organisers, description. You can also change these later on the dashboard.
-   - `one2many.host.*`: the organiser's name, LinkedIn link and a sentence. This card is pinned at the top of every attendee's list.
+   - `one2many.host.*`: a name, a LinkedIn link and a sentence. The link can be a person (`/in/…`) or a LinkedIn page (`/company/…`); by default it is the One2Many page. This card is pinned at the top of every attendee's list.
 2. **Build the app.** In a terminal, in the project folder: `gradlew.bat bootJar`. This creates `build\libs\one2many.jar` with the frontend inside.
 3. **Do a full test run** with `start-event.bat`, a second monitor and a real phone. Scan yourself, open your page on the phone, then press Ctrl+C in both windows.
 4. **Stop the laptop from sleeping.** Sleep drops the tunnel. In a terminal: `powercfg /change standby-timeout-ac 0`. In Windows power settings, set "When I close the lid" (plugged in) to **Do nothing**.

@@ -7,7 +7,7 @@ before anyone uses it.
 ## How to report
 
 - Use GitHub's **"Report a vulnerability"** button (the **Security** tab of this repository), or
-- send me a message on LinkedIn: [Greg Horvath](https://www.linkedin.com/in/gergely-horvath-p5tyos).
+- send me a message on LinkedIn: [Gergely (Greg) Horvath](https://www.linkedin.com/in/gergely-horvath-p5tyos).
 
 Please include what you did, what happened, and what you expected. Please don't test against a
 live event with real attendees; run your own copy instead (see [Development](docs/development.md)).

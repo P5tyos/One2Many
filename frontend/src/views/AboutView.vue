@@ -73,7 +73,7 @@ function back() {
     <section id="referencias" class="card">
       <h2>Referencias</h2>
       <p>
-        Creado por <b>Greg Horvath</b>, estudiante de DAW en Vigo, para un encuentro de estudiantes de
+        Creado por <b>Gergely (Greg) Horvath</b>, estudiante de DAW en Vigo, para un encuentro de estudiantes de
         DAM y DAW.
       </p>
       <div class="links">

@@ -110,7 +110,7 @@ Everyone else who is visible, oldest first. The host card (if configured) comes 
 
 ```json
 [
-  { "name": "Greg Horvath", "message": "Organiser of this networking station.", "linkedinUrl": "https://www.linkedin.com/in/…", "host": true },
+  { "name": "One2Many", "message": "La app que te ha traído esta lista.", "linkedinUrl": "https://www.linkedin.com/company/one2many-app", "host": true },
   { "name": "Ana García", "message": "Estudiante de DAW.", "linkedinUrl": "https://www.linkedin.com/in/ana-garcia", "host": false }
 ]
 ```

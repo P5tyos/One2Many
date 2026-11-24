@@ -67,7 +67,7 @@ One2Many is an independent project, not affiliated with LinkedIn Corporation. Li
 
 ## About
 
-One2Many was created by **Greg Horvath**, a web application development (DAW) student in Vigo, Spain. It is my first complete application, built for a networking event at my school. Feedback is welcome: [LinkedIn](https://www.linkedin.com/in/gergely-horvath-p5tyos).
+One2Many was created by **Gergely (Greg) Horvath**, a web application development (DAW) student in Vigo, Spain. It is my first complete application, built for a networking event at my school. Feedback is welcome: [LinkedIn](https://www.linkedin.com/in/gergely-horvath-p5tyos).
 
 The name is a nod to JPA's `@OneToMany` relationship: one person, many connections.
 
