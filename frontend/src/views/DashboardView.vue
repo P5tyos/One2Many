@@ -90,8 +90,12 @@ const STATUS_LABEL = { VISIBLE: 'Visible', FLAGGED: 'Marcado', PENDING_REVIEW: '
 function time(iso) {
   return new Date(iso).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
 }
+// what the table SHOWS of a link (the link itself stays complete): /qr/ codes can be 100+
+// characters and would stretch the table sideways (seen in the rehearsal, 24 Nov)
+const LINK_SHOWN_MAX = 32
 function shortLink(url) {
-  return url.replace('https://www.linkedin.com', '')
+  const path = url.replace('https://www.linkedin.com', '')
+  return path.length > LINK_SHOWN_MAX ? path.slice(0, LINK_SHOWN_MAX) + '…' : path
 }
 
 // two-click delete: first click asks, second click within a few seconds does it
@@ -369,7 +373,7 @@ onBeforeUnmount(() => {
                   <strong v-if="a.name">{{ a.name }}</strong>
                   <em v-else class="muted">sin nombre aún</em>
                 </template>
-                <a :href="a.linkedinUrl" target="_blank" rel="noopener" class="li">
+                <a :href="a.linkedinUrl" :title="a.linkedinUrl" target="_blank" rel="noopener" class="li">
                   {{ shortLink(a.linkedinUrl) }} ↗
                 </a>
               </td>
