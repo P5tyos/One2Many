@@ -569,7 +569,7 @@ class ReviewFixesTest extends ApiTestSupport {
 
         @Test
         void profilesFlagsAndCountersStay() throws Exception {
-            Phone a = new Phone(uniqueUrl("a")).joinAs("Alice", "hola");
+            new Phone(uniqueUrl("a")).joinAs("Alice", "hola");
             Phone b = new Phone(uniqueUrl("b")).joinAs("Bob", "");
             adminPost("/api/admin/attendees/{id}/flag", b.adminId());
             String statsBefore = adminGet("/api/admin/stats");

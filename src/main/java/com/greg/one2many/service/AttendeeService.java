@@ -305,10 +305,13 @@ public class AttendeeService {
 
     public void reset() {
         logSummary("Event reset by moderator");
+        // phones still open get "the event has ended" (410) instead of a puzzling "invalid link" (Greg, 24 Nov)
+        List<String> openTokens = new ArrayList<>(byToken.keySet());
         byToken.clear();
         byLinkedinUrl.clear();
         rescans.clear();
         retiredTokens.clear();
+        openTokens.forEach(token -> retiredTokens.put(token, "event.ended"));
         totalJoined.set(0);
         totalFlags.set(0);
         totalRemoved.set(0);

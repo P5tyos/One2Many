@@ -118,7 +118,7 @@ If someone whose page is already open on a phone is scanned again (lost phone, c
 - **Datos del evento**: change the event name, date, place, organisers and description at any time. Station and phones update within seconds. A restart brings back the values from `application.properties`.
 - **Estación ahora**: a live mini-copy of what the station shows (never the personal code).
 - **Liberar todas las sesiones** (Emergencia): see [Troubleshooting](#troubleshooting).
-- **Vaciar lista** (Nuevo evento): deletes all attendees. Cannot be undone.
+- **Vaciar lista** (Nuevo evento): deletes all attendees. Cannot be undone. Phones that still have their page open then show "El evento ha terminado. Gracias por usar One2Many. ¡Nos vemos en el próximo!" instead of an error.
 - **Red banner "intentos fallidos de inicio de sesión desde fuera"**: someone is guessing the admin password through the tunnel. Your session is safe. After a few wrong tries, new outside logins pause for a while, which makes guessing hopeless. The banner is red while a pause runs or the last failure was recent; after that it becomes a quiet grey line (so one typo of yours doesn't shout all event).
 
 ## Troubleshooting

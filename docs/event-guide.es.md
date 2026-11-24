@@ -118,7 +118,7 @@ Si se vuelve a escanear a alguien cuya página ya está abierta en un móvil (pe
 - **Datos del evento**: cambia el nombre, la fecha, el lugar, los organizadores y la descripción cuando quieras. La estación y los móviles se actualizan en segundos. Al reiniciar, vuelven los valores de `application.properties`.
 - **Estación ahora**: una mini copia en directo de lo que muestra la estación (nunca el código personal).
 - **Liberar todas las sesiones** (Emergencia): mira [Problemas y soluciones](#problemas-y-soluciones).
-- **Vaciar lista** (Nuevo evento): borra a todos los asistentes. No se puede deshacer.
+- **Vaciar lista** (Nuevo evento): borra a todos los asistentes. No se puede deshacer. Los móviles que aún tengan su página abierta muestran «El evento ha terminado. Gracias por usar One2Many. ¡Nos vemos en el próximo!» en vez de un error.
 - **Banner rojo «intentos fallidos de inicio de sesión desde fuera»**: alguien está intentando adivinar la contraseña de administrador a través del túnel. Tu sesión está a salvo. Tras unos pocos intentos fallidos, los nuevos inicios de sesión desde fuera se pausan un rato, así que adivinarla es imposible en la práctica. El banner es rojo mientras dura una pausa o si el último fallo fue reciente; después pasa a ser una línea gris discreta (así un despiste tuyo no grita todo el evento).
 
 ## Problemas y soluciones

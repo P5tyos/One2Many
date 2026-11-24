@@ -104,14 +104,17 @@ function fail(e) {
     404: 'Enlace no válido',
     409: 'Este código ya se ha usado',
     403: 'Esta página es de otro móvil',
-    410: 'Se ha iniciado una nueva sesión',
+    410: 'Se ha iniciado una nueva sesión', // a confirmed re-scan (the end of the event has its own title)
   }
   if (e.status === undefined) {
     fatal.value = {
       title: 'Sin conexión',
-      text: 'Comprueba tu conexión e inténtalo de nuevo.',
+      text: 'Comprueba tu conexión e inténtalo de nuevo. Si el evento ya ha terminado, ¡gracias por usar One2Many!',
       retry: true,
     }
+  } else if (e.reason === 'event.ended') {
+    // the organiser ended the event ("Vaciar lista"): a friendly goodbye, not an error
+    fatal.value = { title: 'El evento ha terminado', text: e.message, retry: false }
   } else {
     fatal.value = {
       title: titles[e.status] ?? 'Algo ha salido mal',

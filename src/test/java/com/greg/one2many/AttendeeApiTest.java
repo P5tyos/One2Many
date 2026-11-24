@@ -504,7 +504,10 @@ class AttendeeApiTest extends ApiTestSupport {
             Phone alice = new Phone(uniqueUrl("alice")).joinAs("Alice", "hello");
             assertThat(adminPost("/api/admin/reset")).isEqualTo(204);
             assertThat(read(adminGet("/api/admin/stats"), "$.joined", Integer.class)).isZero();
-            assertThat(alice.list().getResponse().getStatus()).isEqualTo(404);
+            // the old phone page is told the event has ended (410), not "invalid link" (404)
+            MvcResult r = alice.list();
+            assertThat(r.getResponse().getStatus()).isEqualTo(410);
+            assertThat(read(body(r), "$.reason", String.class)).isEqualTo("event.ended");
         }
     }
 }

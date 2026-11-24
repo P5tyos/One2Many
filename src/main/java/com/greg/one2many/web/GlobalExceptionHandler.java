@@ -41,8 +41,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(SessionReplacedException.class)
     public ResponseEntity<Map<String, String>> handleSessionReplaced(SessionReplacedException ex) {
+        // "reason" = the message key (session.replaced | event.ended): the phone picks its title from it
         return ResponseEntity.status(HttpStatus.GONE)
-                .body(Map.of("error", resolve(ex.getMessage())));
+                .body(Map.of("error", resolve(ex.getMessage()), "reason", ex.getMessage()));
     }
 
     // 409 Conflict: confirming/rejecting a re-scan that was already answered or expired

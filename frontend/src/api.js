@@ -3,10 +3,11 @@
 // except Spring Security's 401, which has an empty body.
 
 export class ApiError extends Error {
-  constructor(status, message, fields) {
+  constructor(status, message, fields, reason) {
     super(message)
     this.status = status // 400, 401, 403, 404, 409, 410, 422, 500...
     this.fields = fields // per-field validation messages, when status is 400
+    this.reason = reason // why a page is gone (410): 'session.replaced' | 'event.ended'
   }
 }
 
@@ -29,7 +30,7 @@ export async function api(path, { method = 'GET', body } = {}) {
   const data = text ? JSON.parse(text) : null
 
   if (!response.ok) {
-    throw new ApiError(response.status, data?.error ?? 'Error', data?.fields)
+    throw new ApiError(response.status, data?.error ?? 'Error', data?.fields, data?.reason)
   }
   return data
 }

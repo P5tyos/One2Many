@@ -260,7 +260,7 @@ Changes live in memory: a restart brings back `application.properties`.
 | 404 | Unknown token, attendee or re-scan; or an address that doesn't exist |
 | 405 / 415 | Wrong HTTP method / content type. Empty body |
 | 409 | Token already opened on another phone, or re-scan already answered or expired |
-| 410 | Token replaced by a re-scan or by "release all sessions" |
+| 410 | Token replaced by a re-scan or by "release all sessions", or the event was ended with "reset". The body adds `"reason"`: `session.replaced` or `event.ended` |
 | 413 | Request body over 8 KB. Empty body |
 | 422 | Inappropriate language, links, a name that is empty after cleaning, or unchanged text while flagged |
 | 429 | Login paused after repeated wrong passwords from outside (HTTP Basic). `Retry-After` header, empty body |
