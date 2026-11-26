@@ -51,11 +51,11 @@ Running it at a real event (HTTPS tunnel, event settings, a fixed password) is e
 | [Architecture](docs/architecture.md) | How it works inside, and why it was built this way |
 | [API reference](docs/api.md) | Every endpoint and status code |
 | [Development](docs/development.md) | Running it in development mode, tests, conventions |
-| [Security](SECURITY.md) | How to report a weakness privately |
+| [Security](SECURITY.md) | What One2Many protects, and how to report a weakness privately |
 
 ## Built with
 
-Java 21 · Spring Boot 4 · Spring Security · Vue 3 · Vite · Gradle. 341 automated tests: 250 for the backend (JUnit 5 + MockMvc) and 91 for the frontend logic (Vitest).
+Java 21 · Spring Boot 4 · Spring Security · Vue 3 · Vite · Gradle. 367 automated tests: 276 for the backend (JUnit 5 + MockMvc) and 91 for the frontend logic (Vitest).
 
 ## Credits
 
