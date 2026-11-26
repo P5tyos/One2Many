@@ -74,3 +74,5 @@ The name is a nod to JPA's `@OneToMany` relationship: one person, many connectio
 ## License
 
 Licensed under the [Apache License 2.0](LICENSE): you are welcome to use, change and share One2Many, including at your own events. If you share a changed version, keep the [NOTICE](NOTICE) file, mark the files you changed, and don't present it as the original One2Many. Improvements are welcome as pull requests.
+
+**Using One2Many at an event?** I'd love to hear about it. It's not required, just a kind request: tag the [One2Many LinkedIn page](https://www.linkedin.com/company/one2many-app) or [me](https://www.linkedin.com/in/gergely-horvath-p5tyos) in your event post, or send a message. Photos of the station in action are especially welcome. 🙂
