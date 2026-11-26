@@ -155,9 +155,6 @@ class ManualAddAndStatsTest extends ApiTestSupport {
             for (String bad : List.of(
                     "https://evil.example.com/in/someone",
                     "https://linkedin.evil-site.com/in/someone",
-                    "http://www.linkedin.com/in/someone",
-                    "https://www.linkedin.com/company/acme",
-                    "https://www.linkedin.com/in/",
                     "javascript:alert(1)",
                     "  https://www.linkedin.com/in/spaces  ",
                     "")) {
@@ -171,9 +168,9 @@ class ManualAddAndStatsTest extends ApiTestSupport {
         @Test
         void validationErrorIsTheSameAsAtScan() throws Exception {
             MvcResult r = send("https://example.com");
-            assertThat(read(body(r), "$.error", String.class)).isEqualTo("Must be a valid LinkedIn profile URL");
+            assertThat(read(body(r), "$.error", String.class)).isEqualTo("Must be a LinkedIn link (https://www.linkedin.com/...)");
             assertThat(read(body(r), "$.fields.linkedinUrl", String.class))
-                    .isEqualTo("Must be a valid LinkedIn profile URL");
+                    .isEqualTo("Must be a LinkedIn link (https://www.linkedin.com/...)");
 
             MvcResult missing = sendRaw("{}");
             assertThat(missing.getResponse().getStatus()).isEqualTo(400);

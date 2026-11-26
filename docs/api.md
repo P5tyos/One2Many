@@ -129,7 +129,7 @@ A LinkedIn QR was scanned.
 { "linkedinUrl": "https://www.linkedin.com/in/ana-garcia?fromQR=1" }
 ```
 
-Accepted: `https://(www.)linkedin.com/in/<name>` and `https://(www.)linkedin.com/qr/<code>`. The query string is dropped and `/in/` names are lowercased; `/qr/` codes keep their case (they are case-sensitive).
+Accepted: any link to `linkedin.com` (`www.`, `es.`, `m.` or no prefix): profiles (`/in/<name>`, also with accents), QR codes (`/qr/<code>`), pages (`/company/…`). The query string is dropped; `/in/` names are decoded (`%C3%A9` → `é`, only when the result is a plain name; otherwise kept encoded) and lowercased. Links longer than 500 characters are refused; `/qr/` codes keep their case (they are case-sensitive).
 
 ```json
 { "status": "ISSUED", "token": "6f1c…", "rescanId": null, "returningAttendee": false }

@@ -123,9 +123,6 @@ class AttendeeApiTest extends ApiTestSupport {
             for (String bad : List.of(
                     "https://evil.example.com/in/someone",
                     "https://linkedin.evil-site.com/in/someone",
-                    "http://www.linkedin.com/in/someone",          // strict mode: https only
-                    "https://www.linkedin.com/company/acme",       // not a person
-                    "https://www.linkedin.com/in/",                // no name
                     "javascript:alert(1)",
                     "")) {
                 MvcResult r = scanRaw(bad);
@@ -141,8 +138,8 @@ class AttendeeApiTest extends ApiTestSupport {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json("linkedinUrl", "https://example.com")))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.error").value("Must be a valid LinkedIn profile URL"))
-                    .andExpect(jsonPath("$.fields.linkedinUrl").value("Must be a valid LinkedIn profile URL"));
+                    .andExpect(jsonPath("$.error").value("Must be a LinkedIn link (https://www.linkedin.com/...)"))
+                    .andExpect(jsonPath("$.fields.linkedinUrl").value("Must be a LinkedIn link (https://www.linkedin.com/...)"));
         }
 
         @Test

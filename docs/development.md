@@ -148,7 +148,7 @@ docs/                              this documentation
 | Name / sentence length (60 / 100) | `dto/ProfileDetailsRequest` and `NAME_MAX` / `MESSAGE_MAX` in `PersonalView.vue` |
 | Reveals and reveal window (3, 3 min) | `MAX_REVEALS`, `REVEAL_WINDOW_MS` in `StationView.vue` |
 | Scanner timing | `SCANNER_MAX_GAP_MS`, `SCANNER_MIN_LENGTH` in `StationView.vue` |
-| Accepted LinkedIn links | the `@Pattern` in `dto/ScanInRequest` (a more relaxed pattern is there, commented out) |
+| Accepted LinkedIn links | the `@Pattern` in `dto/ScanInRequest` (domain check only, since the 25 Nov event) |
 | Colours, font, radius | `frontend/src/assets/main.css` |
 
 ## Gotchas
@@ -158,4 +158,4 @@ docs/                              this documentation
 - **Scanner = keyboard.** The Windows keyboard layout must match the scanner's. Garbled text like `https;--` means a layout mismatch.
 - **The station builds the personal QR from its own address.** On `localhost` only that computer can open the codes; the built station shows a red warning there.
 - **The LinkedIn app's scanner refuses non-LinkedIn QR codes,** so attendees must scan their personal code with the phone camera.
-- **`/qr/` LinkedIn codes are case-sensitive.** `normalize()` in `AttendeeService` lowercases only the domain and `/in/` names.
+- **`/qr/` LinkedIn codes are case-sensitive.** `normalize()` in `AttendeeService` lowercases only the domain and `/in/` names (after decoding `%C3%A9` → `é`; `readableName()` keeps a name encoded if decoding would produce `/ ? # % ..` or hidden characters, so decoding can never change where a link goes).

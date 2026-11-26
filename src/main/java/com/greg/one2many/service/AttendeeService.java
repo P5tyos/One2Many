@@ -24,13 +24,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.text.Normalizer;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -536,18 +539,75 @@ public class AttendeeService {
         noQuery = noQuery.replaceFirst("(?i)^http://", "https://"); // relaxed mode may let http in
         int pathStart = noQuery.indexOf('/', "https://".length());
         if (pathStart < 0) {
-            return noQuery.toLowerCase(); // no path (e.g. host card not configured)
+            return noQuery.toLowerCase(Locale.ROOT); // no path (e.g. host card not configured)
         }
         // the domain is never case-sensitive; /in/ names aren't either;
         // /qr/ tokens ARE (tested 20 Nov: lowercased token -> page not found)
-        String domain = noQuery.substring(0, pathStart).toLowerCase();
+        String domain = noQuery.substring(0, pathStart).toLowerCase(Locale.ROOT);
         if (domain.endsWith(".linkedin.com") || domain.equals("https://linkedin.com")) {
             domain = "https://www.linkedin.com"; // es./m./no prefix -> the same person, standard link
         }
         String path = noQuery.substring(pathStart);
-        if (path.toLowerCase().startsWith("/in/")) {
-            path = path.toLowerCase();
+        if (path.toLowerCase(Locale.ROOT).startsWith("/in/")) {
+            // "jose-est%C3%A9vez" (copied from a browser) and "jose-estévez" (from the QR) are the
+            // same person: decode first, then lowercase, so both give the same key
+            path = "/in/" + readableName(path.substring("/in/".length())).toLowerCase(Locale.ROOT);
         }
-        return domain + path;
+        return domain + encodeHidden(path);
+    }
+
+    // The name after /in/, made readable and comparable: %C3%A9 -> é, and both ways of typing é
+    // (one character, or "e" + a separate accent) become the same one (NFC).
+    // Safety (review by Claude Code, 26 Nov): the link rule checks the link BEFORE decoding, so the
+    // decoded name must not be able to change where the link goes. If decoding would produce
+    // / ? # \ % or .. (e.g. %2F..%2F..%2Fredir%3Furl%3D...), or invisible/control characters
+    // (line breaks, right-to-left override), the name is kept exactly as scanned, still encoded,
+    // so it stays a harmless part of a linkedin.com path.
+    static String readableName(String name) {
+        String decoded;
+        try {
+            // "+" stays "+" (URLDecoder would turn it into a space)
+            decoded = URLDecoder.decode(name.replace("+", "%2B"), StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException e) {
+            return name; // a broken % sequence: keep it as it was instead of failing the scan
+        }
+        decoded = Normalizer.normalize(decoded, Normalizer.Form.NFC);
+        return isSafeName(decoded) ? decoded : name;
+    }
+
+    private static boolean isSafeName(String name) {
+        return !name.contains("..")
+                && name.codePoints().noneMatch(c -> "/?#%".indexOf(c) >= 0 || isHidden(c));
+    }
+
+    // characters that are invisible, can flip how a link is displayed (right-to-left override),
+    // or that browsers read as "/" (backslash)
+    private static boolean isHidden(int c) {
+        int type = Character.getType(c);
+        return c == '\\' || Character.isWhitespace(c)
+                || type == Character.CONTROL || type == Character.FORMAT
+                || type == Character.LINE_SEPARATOR || type == Character.PARAGRAPH_SEPARATOR
+                || type == Character.UNASSIGNED || type == Character.PRIVATE_USE
+                || type == Character.SURROGATE
+                || type == Character.SPACE_SEPARATOR; // non-breaking spaces look like normal ones
+    }
+
+    // Last line of defence for every stored link (also /company/ and /qr/, which are not decoded):
+    // a hidden character typed raw by a scanner is stored percent-encoded, so it can't be shown.
+    static String encodeHidden(String path) {
+        if (path.codePoints().noneMatch(AttendeeService::isHidden)) {
+            return path;
+        }
+        StringBuilder sb = new StringBuilder();
+        path.codePoints().forEach(c -> {
+            if (isHidden(c)) {
+                for (byte b : new String(Character.toChars(c)).getBytes(StandardCharsets.UTF_8)) {
+                    sb.append(String.format("%%%02X", b & 0xFF));
+                }
+            } else {
+                sb.appendCodePoint(c);
+            }
+        });
+        return sb.toString();
     }
 }
